@@ -356,13 +356,17 @@
             }
 
             function submitPortalLink() {
-                const validationPortalLink = $('#validationPortalLink').val();
-                if (validationPortalLink) {
-                    alert('Validation portal link submitted successfully!');
-                } else {
-                    alert('Please enter a valid validation portal link.');
-                }
+            const validationPortalLink = $('#validationPortalLink').val();
+            if (validationPortalLink) {
+                // Show an alert for confirmation
+                alert('Validation portal link submitted successfully!');
+                
+                // Show a success message below the form
+                $('#submissionMessage').show();
+            } else {
+                alert('Please enter a valid validation portal link.');
             }
+        }
 
             function fetchStatus() {
                 $.get('/status', function (data) {
