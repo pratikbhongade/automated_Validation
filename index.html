@@ -242,7 +242,10 @@
                         </div>
                         <div class="form-group mb-4">
                             <label for="validationPortalLink" class="form-label">Validation Portal Link:</label>
-                            <input type="url" class="form-control" id="validationPortalLink" name="validationPortalLink" placeholder="Enter the validation portal link" required>
+                            <div class="input-group">
+                                <input type="url" class="form-control" id="validationPortalLink" name="validationPortalLink" placeholder="Enter the validation portal link" required>
+                                <button type="button" id="submitPortalLink" class="btn btn-primary">Submit</button>
+                            </div>
                         </div>
                         <div class="d-flex justify-content-between">
                             <button type="submit" class="btn-hover color-start" data-bs-toggle="tooltip" data-bs-placement="top" title="Start the validation process">Start Validation <i class="fas fa-play ms-2"></i></button>
@@ -416,6 +419,11 @@
                     $('#loaderContainer').hide();
                     $('.list-group-item').removeClass('animate-fadein');
                 });
+            });
+
+            $('#submitPortalLink').click(function () {
+                const validationPortalLink = $('#validationPortalLink').val();
+                alert('Validation Portal Link Submitted: ' + validationPortalLink);
             });
         });
     </script>
