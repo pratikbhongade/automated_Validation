@@ -57,12 +57,12 @@
 
         /* Button styles */
         .btn-hover {
-            width: 200px;
+            width: 220px;
             font-size: 16px;
             font-weight: 600;
             color: #fff;
             cursor: pointer;
-            margin: 10px;
+            margin: 10px 15px;
             height: 55px;
             text-align: center;
             border: none;
@@ -93,6 +93,24 @@
         .color-stop {
             background-image: linear-gradient(to right, #eb3941, #f15e64, #e14e53, #e2373f);
             box-shadow: 0 5px 15px rgba(242, 97, 103, .75);
+        }
+
+        /* Submit Button */
+        .submit-btn {
+            background-image: linear-gradient(to right, #ff7e5f, #feb47b);
+            color: #fff;
+            border-radius: 30px;
+            border: none;
+            height: 45px;
+            width: 150px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            background-image: linear-gradient(to right, #feb47b, #ff7e5f);
         }
 
         /* Progress bar styles */
@@ -253,7 +271,7 @@
                             <label for="validationPortalLink" class="form-label">Validation Portal Link:</label>
                             <div class="input-group">
                                 <input type="url" class="form-control" id="validationPortalLink" name="validationPortalLink" placeholder="Enter the validation portal link" required>
-                                <button type="button" class="btn btn-primary" id="submitPortalLink">Submit</button>
+                                <button type="button" class="submit-btn">Submit</button>
                             </div>
                         </div>
                         <div class="d-flex justify-content-between">
@@ -309,14 +327,25 @@
             };
 
             chart = new Chart(ctx, {
-                type: 'pie',
+                type: 'doughnut',
                 data: chartData,
                 options: {
                     responsive: true,
                     plugins: {
                         legend: {
                             position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return `${context.label}: ${context.raw}`;
+                                }
+                            }
                         }
+                    },
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true
                     }
                 }
             });
