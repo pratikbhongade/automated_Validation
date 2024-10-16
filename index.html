@@ -57,13 +57,13 @@
 
         /* Button styles */
         .btn-hover {
+            width: 250px;
             font-size: 18px;
             font-weight: 600;
             color: #fff;
             cursor: pointer;
-            margin: 10px;
+            margin: 20px 25px;
             height: 65px;
-            width: 220px;
             text-align: center;
             border: none;
             background-size: 300% 100%;
@@ -78,11 +78,6 @@
 
         .btn-hover:focus {
             outline: none;
-        }
-
-        .color-submit {
-            background-image: linear-gradient(to right, #3498db, #2980b9, #3f86ed, #3c7dd9);
-            box-shadow: 0 4px 15px 0 rgba(52, 152, 219, 0.75);
         }
 
         .color-start {
@@ -100,10 +95,158 @@
             box-shadow: 0 5px 15px rgba(242, 97, 103, .75);
         }
 
+        /* Submit Button */
+        .submit-btn {
+            background-image: linear-gradient(to right, #ff7e5f, #feb47b);
+            color: #fff;
+            border-radius: 30px;
+            border: none;
+            height: 45px;
+            width: 150px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            background-image: linear-gradient(to right, #feb47b, #ff7e5f);
+        }
+
         /* Progress bar styles */
         .progress-bar {
             background: linear-gradient(45deg, #007bff, #00c6ff);
             transition: width 1s ease-in-out;
+        }
+
+        /* Loader styles */
+        .dot-loader-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            height: 100px;
+        }
+
+        .dot-loader {
+            display: inline-block;
+            position: relative;
+            width: 80px;
+            height: 6px;
+        }
+
+        .dot-loader div {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #007bff;
+            animation-timing-function: cubic-bezier(0, 1, 1, 0);
+        }
+
+        .dot-loader div:nth-child(1) {
+            left: 8px;
+            animation: dot-loader1 0.6s infinite;
+        }
+
+        .dot-loader div:nth-child(2) {
+            left: 8px;
+            animation: dot-loader2 0.6s infinite;
+        }
+
+        .dot-loader div:nth-child(3) {
+            left: 32px;
+            animation: dot-loader2 0.6s infinite;
+        }
+
+        .dot-loader div:nth-child(4) {
+            left: 56px;
+            animation: dot-loader3 0.6s infinite;
+        }
+
+        @keyframes dot-loader1 {
+            0% {
+                transform: scale(0);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes dot-loader3 {
+            0% {
+                transform: scale(1);
+            }
+
+            100% {
+                transform: scale(0);
+            }
+        }
+
+        @keyframes dot-loader2 {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(24px, 0);
+            }
+        }
+
+        /* List styles */
+        .list-group-item {
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #f4f4f4, #e0e0e0);
+        }
+
+        .list-group-item .icon {
+            margin-right: 15px;
+        }
+
+        .list-group-item-success {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+        }
+
+        .list-group-item-danger {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+        }
+
+        .list-group-item-success .icon {
+            color: #28a745;
+        }
+
+        .list-group-item-danger .icon {
+            color: #dc3545;
+        }
+
+        .list-group-item-warning {
+            background: linear-gradient(135deg, #fff3cd, #ffeeba);
+            color: #856404;
+        }
+
+        .list-group-item-warning .icon {
+            color: #ffc107;
+        }
+
+        .tooltip-inner {
+            background-color: #007bff !important;
+            color: #fff;
+        }
+
+        .tooltip-arrow {
+            border-bottom-color: #007bff !important;
+        }
+
+        .disabled-list {
+            pointer-events: none;
+            opacity: 0.5;
         }
     </style>
 </head>
@@ -124,10 +267,12 @@
                                 <option value="Prod">Prod</option>
                             </select>
                         </div>
-                        <div class="form-group mb-4 d-flex align-items-center">
-                            <label for="validationPortalLink" class="form-label me-3">Validation Portal Link:</label>
-                            <input type="url" class="form-control me-3" id="validationPortalLink" name="validationPortalLink" placeholder="Enter the validation portal link" required>
-                            <button type="button" class="btn-hover color-submit" id="submitPortalLinkBtn">Submit</button>
+                        <div class="form-group mb-4">
+                            <label for="validationPortalLink" class="form-label">Validation Portal Link:</label>
+                            <div class="input-group">
+                                <input type="url" class="form-control" id="validationPortalLink" name="validationPortalLink" placeholder="Enter the validation portal link" required>
+                                <button type="button" class="submit-btn" onclick="submitPortalLink()">Submit</button>
+                            </div>
                         </div>
                         <div class="d-flex justify-content-between">
                             <button type="submit" class="btn-hover color-start" data-bs-toggle="tooltip" data-bs-placement="top" title="Start the validation process">Start Validation <i class="fas fa-play ms-2"></i></button>
@@ -143,6 +288,9 @@
                         <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" role="progressbar" style="width: 0%;"></div>
                     </div>
                     <ul id="statusList" class="list-group list-group-flush mt-4"></ul>
+                    <div class="dot-loader-container" id="loaderContainer" style="display: none;">
+                        <div class="dot-loader"><div></div><div></div><div></div><div></div></div>
+                    </div>
                 </div>
             </div>
 
@@ -165,7 +313,7 @@
 
     <script>
         $(document).ready(function () {
-            let validationPortalLink = '';
+            $('[data-bs-toggle="tooltip"]').tooltip();
             let isPaused = false;
             let chart;
             const ctx = document.getElementById('statusChart').getContext('2d');
@@ -179,14 +327,25 @@
             };
 
             chart = new Chart(ctx, {
-                type: 'pie',
+                type: 'doughnut',
                 data: chartData,
                 options: {
                     responsive: true,
                     plugins: {
                         legend: {
                             position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return `${context.label}: ${context.raw}`;
+                                }
+                            }
                         }
+                    },
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true
                     }
                 }
             });
@@ -196,14 +355,14 @@
                 chart.update();
             }
 
-            $('#submitPortalLinkBtn').click(function () {
-                validationPortalLink = $('#validationPortalLink').val();
-                if (!validationPortalLink) {
-                    alert('Please enter the validation portal link');
+            function submitPortalLink() {
+                const validationPortalLink = $('#validationPortalLink').val();
+                if (validationPortalLink) {
+                    alert('Validation portal link submitted successfully!');
                 } else {
-                    alert('Validation portal link submitted successfully');
+                    alert('Please enter a valid validation portal link.');
                 }
-            });
+            }
 
             function fetchStatus() {
                 $.get('/status', function (data) {
@@ -243,6 +402,8 @@
 
                     if (data.status === 'Completed' || data.status === 'Failed' || data.status === 'Stopped') {
                         clearInterval(intervalId);
+                        $('#loaderContainer').hide();
+                        $('.list-group-item').removeClass('animate-fadein');
                     }
                 });
             }
@@ -250,15 +411,12 @@
             $('#validationForm').submit(function (e) {
                 e.preventDefault();
                 const environment = $('#environment').val();
-                if (!validationPortalLink) {
-                    alert('Please submit the validation portal link');
-                    return;
-                }
-
+                const validationPortalLink = $('#validationPortalLink').val();
                 $('#statusContainer').show();
                 $('#statusText').text('Running');
                 $('#progressBar').css('width', '0%');
                 $('#statusList').empty();
+                $('#loaderContainer').show();
 
                 $.ajax({
                     url: '/start_validation',
@@ -278,6 +436,8 @@
                 function checkCompletion() {
                     if ($('#statusText').text() === 'Completed' || $('#statusText').text() === 'Failed' || $('#statusText').text() === 'Stopped') {
                         clearInterval(intervalId);
+                        $('#loaderContainer').hide();
+                        $('.list-group-item').removeClass('animate-fadein');
                     }
                 }
 
@@ -303,6 +463,8 @@
             $('#stopBtn').click(function () {
                 $.post('/stop_validation', function () {
                     $('#statusText').text('Stopped');
+                    $('#loaderContainer').hide();
+                    $('.list-group-item').removeClass('animate-fadein');
                 });
             });
         });
