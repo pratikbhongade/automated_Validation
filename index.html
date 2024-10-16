@@ -95,12 +95,6 @@
             box-shadow: 0 5px 15px rgba(242, 97, 103, .75);
         }
 
-        .btn-container {
-            display: flex;
-            justify-content: space-between;
-            gap: 20px; /* Increased spacing between buttons */
-        }
-
         /* Progress bar styles */
         .progress-bar {
             background: linear-gradient(45deg, #007bff, #00c6ff);
@@ -257,9 +251,12 @@
                         </div>
                         <div class="form-group mb-4">
                             <label for="validationPortalLink" class="form-label">Validation Portal Link:</label>
-                            <input type="url" class="form-control" id="validationPortalLink" name="validationPortalLink" placeholder="Enter the validation portal link" required>
+                            <div class="input-group">
+                                <input type="url" class="form-control" id="validationPortalLink" name="validationPortalLink" placeholder="Enter the validation portal link" required>
+                                <button type="button" class="btn btn-primary" id="submitPortalLink">Submit</button>
+                            </div>
                         </div>
-                        <div class="btn-container">
+                        <div class="d-flex justify-content-between">
                             <button type="submit" class="btn-hover color-start" data-bs-toggle="tooltip" data-bs-placement="top" title="Start the validation process">Start Validation <i class="fas fa-play ms-2"></i></button>
                             <button type="button" id="pauseBtn" class="btn-hover color-pause" data-bs-toggle="tooltip" data-bs-placement="top" title="Pause the validation process">Pause Validation <i class="fas fa-pause ms-2"></i></button>
                             <button type="button" id="stopBtn" class="btn-hover color-stop" data-bs-toggle="tooltip" data-bs-placement="top" title="Stop the validation process">Stop Validation <i class="fas fa-stop ms-2"></i></button>
