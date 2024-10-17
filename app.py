@@ -2,9 +2,9 @@ import os
 import json
 import time
 import logging
+from flask import Flask, render_template, request, jsonify
 import threading
 import pythoncom
-from flask import Flask, render_template, request, jsonify
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -26,13 +26,15 @@ log_file_path = os.path.join(os.getcwd(), 'validation.log')
 logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
 
 validation_status = {'status': 'Not Started', 'results': [], 'paused': False, 'stopped': False}
+
 pause_event = threading.Event()
 pause_event.set()
 
 stop_event = threading.Event()
 stop_event.clear()
 
-def validate_application(environment, validation_portal_link):
+
+def validate_application(environment, validation_portal_link=None):
     global validation_status
     # Set the URL based on environment
     url = config['environments'].get(environment.upper())
@@ -108,7 +110,7 @@ def validate_application(environment, validation_portal_link):
             log_and_update_status(result, "Failed")
             return False
 
-    # Validation for the first list element and clicking the cancel button
+    # Function to validate the first list element under the specified column and click the cancel button
     def validate_first_list_element_and_cancel(column_index, main_index, sub_index, is_export_control=False):
         pause_event.wait()
         if stop_event.is_set():
@@ -220,48 +222,39 @@ def validate_application(environment, validation_portal_link):
     if all_tabs_opened:
         result = ("Validation completed successfully.", "Success")
         log_and_update_status(result[0])
+
+        # If a validation portal link was provided, handle the Set Testing Results
+        if validation_portal_link:
+            try:
+                driver = webdriver.Edge()  # Initialize WebDriver again for validation portal
+                driver.get(validation_portal_link)
+                time.sleep(2)
+                set_results_button = driver.find_element(By.XPATH, "//button[contains(.,'Set Testing Results')]")
+                set_results_button.click()
+                time.sleep(2)
+
+                # Use pyautogui to click Success radio button and OK buttons
+                pyautogui.click(536, 460)
+                time.sleep(1)
+                pyautogui.click(1395, 896)
+                time.sleep(1)
+                pyautogui.click(1113, 374)
+
+                log_and_update_status("Validation results submitted successfully to the portal.", "Success")
+            except Exception as e:
+                log_and_update_status(f"Error while submitting test results to portal: {e}", "Failed")
+
     else:
         result = ("Validation failed.", "Failed")
         log_and_update_status(result[0], "Failed")
 
-    # Navigate to the validation portal link to submit test results
-    submit_test_results(validation_portal_link)
-    
     return validation_results, all_tabs_opened
 
-def submit_test_results(validation_portal_link):
-    # Navigate to the validation portal link
-    driver = webdriver.Edge()
-    driver.get(validation_portal_link)
-
-    # Find the 'Set Testing Results' button and click it
-    try:
-        set_testing_results_button = driver.find_element(By.XPATH, "//button[@type='Button' and contains(text(),'Set Testing Results')]")
-        set_testing_results_button.click()
-        print("Set Testing Results button clicked.")
-    except Exception as e:
-        print(f"Error clicking Set Testing Results button: {e}")
-        driver.quit()
-
-    # Pause to allow new window to load
-    time.sleep(5)
-
-    # Use PyAutoGUI to select the Success radio button and click OK
-    try:
-        pyautogui.click(536, 460)  # Click the Success radio button
-        time.sleep(1)
-        pyautogui.click(1395, 896)  # Click the first OK button
-        time.sleep(1)
-        pyautogui.click(1113, 374)  # Click the confirmation OK button
-        print("Test results successfully submitted!")
-    except Exception as e:
-        print(f"Error using PyAutoGUI: {e}")
-
-    driver.quit()
 
 @app.route('/')
 def home():
     return render_template('index.html', project_name=project_name)
+
 
 @app.route('/start_validation', methods=['POST'])
 def start_validation():
@@ -285,6 +278,7 @@ def start_validation():
     thread.start()
     return jsonify({"message": "Validation started"}), 202
 
+
 @app.route('/pause_resume_validation', methods=['POST'])
 def pause_resume_validation():
     global pause_event, validation_status
@@ -298,6 +292,7 @@ def pause_resume_validation():
         validation_status['status'] = 'Running'
     return jsonify({"message": "Validation paused/resumed"}), 200
 
+
 @app.route('/stop_validation', methods=['POST'])
 def stop_validation():
     global stop_event, validation_status
@@ -305,9 +300,11 @@ def stop_validation():
     validation_status['status'] = 'Stopped'
     return jsonify({"message": "Validation stopped"}), 200
 
+
 @app.route('/status')
 def status():
     return jsonify(validation_status)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
