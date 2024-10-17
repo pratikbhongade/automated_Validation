@@ -10,13 +10,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, JavascriptException
-import pyautogui
 from email_sender import send_email
+import pyautogui
 
 app = Flask(__name__)
 
 # Load JSON configuration
-with open('validation_config.json') as config_file:
+config_path = os.path.join(os.getcwd(), 'validation_config.json')
+with open(config_path) as config_file:
     config = json.load(config_file)
 
 project_name = config['project_name']
@@ -223,32 +224,40 @@ def validate_application(environment, validation_portal_link=None):
         result = ("Validation completed successfully.", "Success")
         log_and_update_status(result[0])
 
-        # If a validation portal link was provided, handle the Set Testing Results
+        # If a validation portal link is provided, navigate and submit results
         if validation_portal_link:
-            try:
-                driver = webdriver.Edge()  # Initialize WebDriver again for validation portal
-                driver.get(validation_portal_link)
-                time.sleep(2)
-                set_results_button = driver.find_element(By.XPATH, "//button[contains(.,'Set Testing Results')]")
-                set_results_button.click()
-                time.sleep(2)
-
-                # Use pyautogui to click Success radio button and OK buttons
-                pyautogui.click(536, 460)
-                time.sleep(1)
-                pyautogui.click(1395, 896)
-                time.sleep(1)
-                pyautogui.click(1113, 374)
-
-                log_and_update_status("Validation results submitted successfully to the portal.", "Success")
-            except Exception as e:
-                log_and_update_status(f"Error while submitting test results to portal: {e}", "Failed")
-
+            submit_test_results(validation_portal_link)
     else:
         result = ("Validation failed.", "Failed")
         log_and_update_status(result[0], "Failed")
 
     return validation_results, all_tabs_opened
+
+
+def submit_test_results(validation_portal_link):
+    try:
+        driver = webdriver.Edge()
+        driver.get(validation_portal_link)
+
+        # Locate the "Set Testing Results" button and click it
+        set_results_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(),'Set Testing Results')]"))
+        )
+        set_results_button.click()
+        time.sleep(5)  # Wait for the new page to load
+
+        # Use pyautogui for clicking success radio button and OK buttons
+        pyautogui.click(536, 460)  # Click Success
+        time.sleep(1)
+        pyautogui.click(1395, 896)  # Click OK
+        time.sleep(1)
+        pyautogui.click(1113, 374)  # Confirm OK
+        logging.info("Test results successfully submitted via Validation Portal.")
+
+    except Exception as e:
+        logging.error(f"Error submitting results to validation portal: {e}")
+    finally:
+        driver.quit()
 
 
 @app.route('/')
@@ -263,7 +272,7 @@ def start_validation():
     pause_event.set()
     data = request.json
     environment = data.get('environment')
-    validation_portal_link = data.get('validation_portal_link')
+    validation_portal_link = data.get('validation_portal_link', None)
     validation_status['status'] = 'Running'
     validation_status['results'] = []
 
