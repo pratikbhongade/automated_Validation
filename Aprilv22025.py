@@ -317,27 +317,30 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             
             # Use the retry click function
             if not click_element_with_retry(tab_element):
-                result = f"{index}. Failed to click on Main Tab '{tab_name}' - element became stale."
+                result = f"{index}. Failed to click on Main Tab '{tab_name}' even though the element is present."
                 log_and_update_status(result, "Failed")
                 return False
                 
             locator_type = content_locator['type']
             locator_value = content_locator['value']
             
-            if locator_type == 'css':
-                WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, locator_value)))
-            elif locator_type == 'id':
-                WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.ID, locator_value)))
+            # Check if expected content appears after clicking
+            try:
+                if locator_type == 'css':
+                    WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, locator_value)))
+                elif locator_type == 'id':
+                    WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.ID, locator_value)))
+            except (TimeoutException, NoSuchElementException):
+                result = f"{index}. Main Tab '{tab_name}' was clicked but expected content did not appear."
+                log_and_update_status(result, "Failed")
+                return False
                 
             result = f"{index}. Main Tab '{tab_name}' opened successfully."
             log_and_update_status(result)
             return True
-        except TimeoutException:
-            result = f"{index}. Failed to open Main Tab '{tab_name}'."
-            log_and_update_status(result, "Failed")
-            return False
+            
         except StaleElementReferenceException:
-            result = f"{index}. StaleElementReferenceException on Main Tab '{tab_name}'. The page may have changed."
+            result = f"{index}. StaleElementReferenceException on Main Tab '{tab_name}'. The page may have changed while trying to interact with it."
             log_and_update_status(result, "Failed")
             return False
     
@@ -348,28 +351,37 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
 
         try:
             time.sleep(1)
+            # Execute the JavaScript to navigate to the sub-tab
             driver.execute_script(sub_tab_js)
+            
+            # Verify that the expected content appears
             locator_type = content_locator['type']
             locator_value = content_locator['value']
             
-            if locator_type == 'css':
-                WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, locator_value)))
-            elif locator_type == 'id':
-                WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.ID, locator_value)))
+            try:
+                if locator_type == 'css':
+                    WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, locator_value)))
+                elif locator_type == 'id':
+                    WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.ID, locator_value)))
+            except (TimeoutException, NoSuchElementException):
+                result = f"{main_index}.{chr(96 + sub_index)}. Sub Tab '{sub_tab_name}' was activated but expected content did not appear."
+                log_and_update_status(result, "Failed")
+                return False
                 
             result = f"{main_index}.{chr(96 + sub_index)}. Sub Tab '{sub_tab_name}' opened successfully."
             log_and_update_status(result)
             return True
-        except TimeoutException:
-            result = f"{main_index}.{chr(96 + sub_index)}. Failed to open Sub Tab '{sub_tab_name}'."
-            log_and_update_status(result, "Failed")
-            return False
+            
         except JavascriptException as e:
             result = f"{main_index}.{chr(96 + sub_index)}. JavaScript error on Sub Tab '{sub_tab_name}': {e}"
             log_and_update_status(result, "Failed")
             return False
         except StaleElementReferenceException:
-            result = f"{main_index}.{chr(96 + sub_index)}. StaleElementReferenceException on Sub Tab '{sub_tab_name}'. The page may have changed."
+            result = f"{main_index}.{chr(96 + sub_index)}. StaleElementReferenceException on Sub Tab '{sub_tab_name}'. The page may have changed during interaction."
+            log_and_update_status(result, "Failed")
+            return False
+        except Exception as e:
+            result = f"{main_index}.{chr(96 + sub_index)}. Unexpected error activating Sub Tab '{sub_tab_name}': {str(e)}"
             log_and_update_status(result, "Failed")
             return False
     
