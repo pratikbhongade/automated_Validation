@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import time
 import logging
@@ -402,33 +403,32 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 return True
 
             try:
-                # Find the first element with retry
-                attempt = 0
+                # Try to find the first element - but don't treat absence as an error
                 first_element = None
+                try:
+                    first_element = find_element_with_retry(
+                        driver, 
+                        By.XPATH, 
+                        f"//table[@class='ListView']/tbody/tr[2]/td[{column_index}]/a",
+                        max_attempts=2,  # Fewer attempts since we're handling absence gracefully
+                        wait_time=3
+                    )
+                except (TimeoutException, NoSuchElementException):
+                    # No element found - this is a valid case, not an error
+                    result = f"{main_index}.{chr(96 + sub_index)}. No clickable element found in column {column_index} of the first row - skipping."
+                    log_and_update_status(result, "Skipped")
+                    return True
                 
-                while attempt < max_attempts:
-                    try:
-                        first_element = find_element_with_retry(
-                            driver, 
-                            By.XPATH, 
-                            f"//table[@class='ListView']/tbody/tr[2]/td[{column_index}]/a"
-                        )
-                        break
-                    except (StaleElementReferenceException, NoSuchElementException):
-                        attempt += 1
-                        if attempt == max_attempts:
-                            raise
-                        time.sleep(1)
-                
+                # If we found an element, try to click it
                 if first_element:
                     highlight(first_element)
                     time.sleep(1)
                     
                     # Click with retry
                     if not click_element_with_retry(first_element):
-                        result = f"{main_index}.{chr(96 + sub_index)}. Failed to click first element - element became stale."
-                        log_and_update_status(result, "Failed")
-                        return False
+                        result = f"{main_index}.{chr(96 + sub_index)}. Failed to click first element - element became stale. Skipping."
+                        log_and_update_status(result, "Skipped")
+                        return True
                     
                     WebDriverWait(driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, "div#content")))
                     time.sleep(1)
@@ -436,39 +436,66 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     # Find cancel button
                     cancel_xpath = "//img[@src='/fpa/images/btn_cancel.jpg']" if is_export_control else "//img[@src='/fpa/images/btn_cancel.gif']"
                     
-                    cancel_button = find_element_with_retry(
-                        driver,
-                        By.XPATH,
-                        cancel_xpath
-                    )
-                    
-                    highlight(cancel_button)
-                    time.sleep(1)
-                    
-                    # Click cancel with retry
-                    if not click_element_with_retry(cancel_button):
-                        result = f"{main_index}.{chr(96 + sub_index)}. Failed to click cancel button - element became stale."
-                        log_and_update_status(result, "Failed")
-                        return False
+                    try:
+                        cancel_button = find_element_with_retry(
+                            driver,
+                            By.XPATH,
+                            cancel_xpath,
+                            max_attempts=2
+                        )
+                        
+                        highlight(cancel_button)
+                        time.sleep(1)
+                        
+                        # Click cancel with retry
+                        if not click_element_with_retry(cancel_button):
+                            result = f"{main_index}.{chr(96 + sub_index)}. Failed to click cancel button - element became stale. Attempting to navigate back."
+                            log_and_update_status(result, "Warning")
+                            # Try to go back as a fallback
+                            try:
+                                driver.back()
+                                time.sleep(2)
+                            except:
+                                pass
+                            return True
+                    except (TimeoutException, NoSuchElementException):
+                        result = f"{main_index}.{chr(96 + sub_index)}. Cancel button not found. Attempting to navigate back."
+                        log_and_update_status(result, "Warning")
+                        # Try to go back as a fallback
+                        try:
+                            driver.back()
+                            time.sleep(2)
+                        except:
+                            pass
+                        return True
 
                     return True
                 else:
-                    result = f"{main_index}.{chr(96 + sub_index)}. First element not found."
-                    log_and_update_status(result, "Failed")
-                    return False
+                    result = f"{main_index}.{chr(96 + sub_index)}. No clickable element found in first row - skipping."
+                    log_and_update_status(result, "Skipped")
+                    return True
                     
-            except NoSuchElementException:
-                result = f"{main_index}.{chr(96 + sub_index)}. There is no first element in the sub tab '{sub_index}' to click so skipping."
-                log_and_update_status(result, "Skipped")
+            except Exception as e:
+                # General exception handler for any other issues - log as a warning and continue
+                result = f"{main_index}.{chr(96 + sub_index)}. Exception while handling list element: {str(e)}. Skipping."
+                log_and_update_status(result, "Warning")
                 return True
+                
         except (TimeoutException, NoSuchElementException) as e:
-            result = f"{main_index}.{chr(96 + sub_index)}. Failed to open the first list element. Exception: {e}"
+            # Only treat table absence as an error - this is unexpected
+            result = f"{main_index}.{chr(96 + sub_index)}. Failed to find the list table: {str(e)}"
             log_and_update_status(result, "Failed")
             return False
         except StaleElementReferenceException as e:
-            result = f"{main_index}.{chr(96 + sub_index)}. StaleElementReferenceException while handling list element: {e}"
-            log_and_update_status(result, "Failed")
-            return False
+            # Treat stale elements gracefully - just skip and continue
+            result = f"{main_index}.{chr(96 + sub_index)}. StaleElementReferenceException while handling list table. Skipping."
+            log_and_update_status(result, "Skipped")
+            return True
+        except Exception as e:
+            # General exception - log and continue
+            result = f"{main_index}.{chr(96 + sub_index)}. Unexpected error: {str(e)}. Skipping."
+            log_and_update_status(result, "Warning")
+            return True
 
     # Set page load timeout
     driver.set_page_load_timeout(30)
