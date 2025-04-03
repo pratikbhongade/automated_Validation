@@ -1,0 +1,197 @@
+<!-- templates/report_template.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Validation Report</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .report-section { margin-bottom: 40px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .screenshot-thumbnail { cursor: pointer; transition: transform 0.2s; margin: 5px; }
+    .screenshot-thumbnail:hover { transform: scale(1.05); }
+    .modal-image { max-width: 100%; max-height: 80vh; }
+    .nav-tabs .nav-link.active { font-weight: bold; }
+    .timing-table th { white-space: nowrap; }
+    .tab-pane { padding: 15px 0; }
+  </style>
+</head>
+<body>
+  <div class="container mt-4">
+    <h1 class="text-center mb-4">Validation Report</h1>
+    
+    <ul class="nav nav-tabs" id="reportTabs">
+      <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#summary">Summary</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#performance">Performance</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#screenshots">Screenshots</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#details">Detailed Results</a>
+      </li>
+    </ul>
+    
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="summary">
+        <div class="row">
+          <div class="col-md-6">
+            <canvas id="summaryChart" height="300"></canvas>
+          </div>
+          <div class="col-md-6">
+            <table class="table table-bordered">
+              <tr><th>Environment</th><td>{{ environment }}</td></tr>
+              <tr><th>Start Time</th><td>{{ start_time }}</td></tr>
+              <tr><th>End Time</th><td>{{ end_time }}</td></tr>
+              <tr><th>Duration</th><td>{{ duration }}</td></tr>
+              <tr><th>Total Checks</th><td>{{ total_checks }}</td></tr>
+              <tr><th>Successful</th><td>{{ successful_checks }}</td></tr>
+              <tr><th>Failed</th><td>{{ failed_checks }}</td></tr>
+              <tr><th>Skipped</th><td>{{ skipped_checks }}</td></tr>
+            </table>
+            <button class="btn btn-primary" onclick="window.print()">Print Report</button>
+            <button class="btn btn-success ms-2" id="exportReport">Export as HTML</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="tab-pane fade" id="performance">
+        <div class="row">
+          <div class="col-md-6">
+            <h4>Component Load Times (ms)</h4>
+            <canvas id="componentLoadChart" height="300"></canvas>
+          </div>
+          <div class="col-md-6">
+            <h4>Interaction Times (ms)</h4>
+            <canvas id="interactionChart" height="300"></canvas>
+          </div>
+        </div>
+        <div class="mt-4">
+          <h4>Detailed Timing Data</h4>
+          <table class="table table-striped timing-table">
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Count</th>
+                <th>Min</th>
+                <th>Max</th>
+                <th>Avg</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for component, stats in component_stats.items() %}
+              <tr>
+                <td>{{ component }}</td>
+                <td>{{ stats.count }}</td>
+                <td>{{ stats.min|round(2) }}</td>
+                <td>{{ stats.max|round(2) }}</td>
+                <td>{{ stats.avg|round(2) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div class="tab-pane fade" id="screenshots">
+        <h4>Screenshot Gallery</h4>
+        <div class="screenshot-gallery">
+          {% for screenshot in screenshots %}
+          <img src="{{ screenshot.data_url }}" 
+               class="screenshot-thumbnail img-thumbnail" 
+               width="200" 
+               data-bs-toggle="modal" 
+               data-bs-target="#screenshotModal"
+               onclick="document.getElementById('modalImage').src='{{ screenshot.data_url }}'">
+          {% endfor %}
+        </div>
+      </div>
+      
+      <div class="tab-pane fade" id="details">
+        <h4>Detailed Validation Results</h4>
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Check</th>
+              <th>Status</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for result in results %}
+            <tr class="{% if result.status == 'Success' %}table-success{% elif result.status == 'Failed' %}table-danger{% else %}table-warning{% endif %}">
+              <td>{{ loop.index }}</td>
+              <td>{{ result.message }}</td>
+              <td>{{ result.status }}</td>
+              <td>{{ result.timestamp }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- Screenshot Modal -->
+    <div class="modal fade" id="screenshotModal" tabindex="-1">
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Screenshot</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body text-center">
+            <img id="modalImage" class="modal-image">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Summary Chart
+      new Chart(document.getElementById('summaryChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Success', 'Failed', 'Skipped'],
+          datasets: [{
+            data: [{{ successful_checks }}, {{ failed_checks }}, {{ skipped_checks }}],
+            backgroundColor: ['#28a745', '#dc3545', '#ffc107']
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.label}: ${context.raw}`;
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // Performance Charts would be initialized here with actual data
+      
+      // Export functionality
+      document.getElementById('exportReport').addEventListener('click', function() {
+        const html = document.documentElement.outerHTML;
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `validation_report_${new Date().toISOString().slice(0,10)}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+    });
+  </script>
+</body>
+</html>
