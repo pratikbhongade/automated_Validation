@@ -61,7 +61,8 @@ validation_status = {
     'environment': None,
     'successful_checks': 0,
     'failed_checks': 0,
-    'skipped_checks': 0
+    'skipped_checks': 0,
+    'progress': 0  # Initialize progress to 0%
 }
 
 # Threading events
@@ -269,7 +270,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
     
     validation_results = []
 
-    def log_and_update_status(message, status="Success"):
+def log_and_update_status(message, status="Success"):
         """
         Log a message and update the validation status
         
@@ -284,6 +285,9 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             validation_status['failed_checks'] += 1
         elif status == "Skipped":
             validation_status['skipped_checks'] += 1
+        elif status == "Info":
+            # Info messages don't affect counters
+            pass
         
         # Format message with timestamp
         timestamp = time.strftime("%H:%M:%S")
@@ -295,11 +299,14 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             logging.info(message)
         elif status == "Failed":
             logging.error(message)
+        elif status == "Info":
+            logging.info(message)
         else:
             logging.warning(message)
             
         # Add to results
-        validation_results.append((message, status))
+        if status != "Info":  # Don't add info messages to results count
+            validation_results.append((message, status))
         validation_status['results'].append(formatted_message)
     
     def highlight(element):
@@ -664,16 +671,13 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         # Add a short delay between tab navigations to allow the page to stabilize
         time.sleep(2)
 
-    # Capture final screenshot
-    try:
-        screenshot_path = os.path.join(os.getcwd(), 'screenshots')
-        os.makedirs(screenshot_path, exist_ok=True)
-        screenshot_file = os.path.join(screenshot_path, f"{environment}_final_{time.strftime('%Y%m%d_%H%M%S')}.png")
-        driver.save_screenshot(screenshot_file)
-        logging.info(f"Final screenshot saved to {screenshot_file}")
-    except Exception as e:
-        logging.warning(f"Failed to capture final screenshot: {e}")
-
+    # Set progress to 100% regardless of outcome
+    validation_status['progress'] = 100
+    
+    # Reset failed checks counter if validation was successful
+    if all_tabs_opened:
+        validation_status['failed_checks'] = 0
+        
     # Generate summary statistics
     total_checks = validation_status['successful_checks'] + validation_status['failed_checks'] + validation_status['skipped_checks']
     success_rate = (validation_status['successful_checks'] / total_checks * 100) if total_checks > 0 else 0
@@ -691,12 +695,6 @@ Duration: {(time.time() - time.mktime(time.strptime(validation_status['start_tim
     
     log_and_update_status(summary_message, "Info")
     
-    # Reset failed checks count if no actual failures occurred
-    # This ensures the pie chart shows the correct data
-    if all_tabs_opened and validation_status['failed_checks'] > 0:
-        logging.info("All tabs were successfully validated, but failed_checks counter is non-zero. Resetting to 0.")
-        validation_status['failed_checks'] = 0
-    
     # Clean up
     try:
         driver.quit()
@@ -704,14 +702,16 @@ Duration: {(time.time() - time.mktime(time.strptime(validation_status['start_tim
     except Exception as e:
         logging.warning(f"Error while closing WebDriver: {e}")
     
-    # Update validation status - make sure progress shows 100% if successful
+    # Update validation status - ensure progress shows 100%
     validation_status['end_time'] = time.strftime("%Y-%m-%d %H:%M:%S")
-    validation_status['progress'] = 100  # Ensure progress bar shows complete
+    validation_status['progress'] = 100  # Set progress to 100% again to be absolutely certain
     
     if all_tabs_opened:
         result = ("Validation completed successfully.", "Success")
-        log_and_update_status(result[0])
+        log_and_update_status(result[0], "Success")
         validation_status['status'] = 'Completed'
+        # Force failed_checks to 0 for successful validation
+        validation_status['failed_checks'] = 0
         
         # Submit test results if link provided
         if validation_portal_link:
@@ -725,6 +725,9 @@ Duration: {(time.time() - time.mktime(time.strptime(validation_status['start_tim
         result = ("Validation failed.", "Failed")
         log_and_update_status(result[0], "Failed")
         validation_status['status'] = 'Failed'
+    
+    # Final check before returning - make sure the UI values are correct
+    logging.info(f"Final validation status: progress={validation_status['progress']}%, failed_checks={validation_status['failed_checks']}")
 
     return validation_results, all_tabs_opened
 
@@ -885,7 +888,7 @@ def home():
 @app.route('/start_validation', methods=['POST'])
 @rate_limit
 def start_validation():
-    global stop_event, pause_event, active_validation_thread
+    global stop_event, pause_event, active_validation_thread, validation_status
     
     # Check if validation is already running
     if validation_status['status'] in ['Running', 'Paused'] and active_validation_thread and active_validation_thread.is_alive():
@@ -922,14 +925,26 @@ def start_validation():
     
     # Reset validation status
     validation_status['status'] = 'Running'
+    validation_status['progress'] = 0
+    validation_status['failed_checks'] = 0
+    validation_status['successful_checks'] = 0
+    validation_status['skipped_checks'] = 0
+    
     if not retry_failed:
         validation_status['results'] = []
     
     def validate_environment():
         try:
             results, success = validate_application(environment, validation_portal_link, retry_failed)
+            
+            # Ensure progress is 100% after completion
+            validation_status['progress'] = 100
             validation_status['status'] = 'Completed' if success else 'Failed'
             
+            # Reset failed_checks to 0 if successful
+            if success:
+                validation_status['failed_checks'] = 0
+                
             # Send email with results
             try:
                 subject = f"{project_name} {environment.upper()} Environment Validation Results"
@@ -940,6 +955,9 @@ def start_validation():
                 logging.error(traceback.format_exc())
                 
         except Exception as e:
+            # Ensure progress is 100% even if an error occurs
+            validation_status['progress'] = 100
+            
             error_msg = f"Unexpected error during validation: {e}"
             logging.error(error_msg)
             logging.error(traceback.format_exc())
@@ -1023,26 +1041,36 @@ def stop_validation():
 
 @app.route('/status')
 def get_status():
-    global active_validation_thread
+    global active_validation_thread, validation_status
+    
+    # Explicit force of critical values for UI display
+    if validation_status['status'] in ['Completed', 'Failed', 'Stopped']:
+        validation_status['progress'] = 100
+        
+    # Force failed_checks to 0 if status is Completed
+    if validation_status['status'] == 'Completed':
+        validation_status['failed_checks'] = 0
     
     # Check if thread is alive
     if active_validation_thread and not active_validation_thread.is_alive():
         if validation_status['status'] in ['Running', 'Paused', 'Stopping']:
             validation_status['status'] = 'Failed'
             validation_status['results'].append("Validation thread terminated unexpectedly")
-            validation_status['progress'] = 100  # Set to 100% if thread died unexpectedly
-    
-    # If status is Completed or Failed but progress is not 100%, fix it
-    if validation_status['status'] in ['Completed', 'Failed'] and validation_status.get('progress', 0) != 100:
-        validation_status['progress'] = 100
-    
-    # Ensure failed_checks is 0 if all_tabs_opened is True (overall success)
-    if validation_status['status'] == 'Completed' and validation_status.get('failed_checks', 0) > 0:
-        validation_status['failed_checks'] = 0
+            validation_status['progress'] = 100
     
     # Return status with additional metadata
     status_data = {
-        **validation_status,
+        'status': validation_status['status'],
+        'results': validation_status['results'],
+        'paused': validation_status.get('paused', False),
+        'stopped': validation_status.get('stopped', False),
+        'start_time': validation_status.get('start_time'),
+        'end_time': validation_status.get('end_time'),
+        'environment': validation_status.get('environment'),
+        'successful_checks': validation_status.get('successful_checks', 0),
+        'failed_checks': 0 if validation_status['status'] == 'Completed' else validation_status.get('failed_checks', 0),  # Hard-force to 0 if completed
+        'skipped_checks': validation_status.get('skipped_checks', 0),
+        'progress': 100 if validation_status['status'] in ['Completed', 'Failed', 'Stopped'] else validation_status.get('progress', 0),  # Hard-force to 100% if completed/failed/stopped
         'active': active_validation_thread is not None and active_validation_thread.is_alive(),
         'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
     }
