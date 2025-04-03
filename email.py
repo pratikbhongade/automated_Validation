@@ -83,7 +83,26 @@ def send_email(subject, validation_results, success, log_file_path):
                 padding-top: 15px; 
                 border-top: 1px solid #eaeaea;
                 font-size: 13px;
-                color: #6c757d;
+            }}
+            .footer p {{
+                margin: 8px 0;
+            }}
+            .next-steps {{
+                margin-top: 15px;
+                padding-left: 20px;
+            }}
+            .next-steps li {{
+                margin-bottom: 5px;
+            }}
+            .signature {{
+                margin-top: 15px;
+                line-height: 1.4;
+            }}
+            .timestamp {{
+                color: #6c757d; 
+                font-size: 12px;
+                text-align: center;
+                margin-top: 20px;
             }}
         </style>
     </head>
@@ -138,7 +157,7 @@ def send_email(subject, validation_results, success, log_file_path):
         </div>
         """
 
-    # Add status banner
+    # Add status banner and footer
     email_body += f"""
             </div>
             <div class="status-banner">
@@ -146,8 +165,26 @@ def send_email(subject, validation_results, success, log_file_path):
             </div>
             
             <div class="footer">
-                <p>Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-                <p>This is an automated message - please do not reply directly</p>
+                <div class="signature">
+                    <p>Best regards,</p>
+                    <p><strong>Pratik Bhongade</strong><br>
+                    Automation Engineer<br>
+                    KeyBank Technology Team</p>
+                </div>
+                
+                <div class="next-steps">
+                    <p><strong>Next Steps:</strong></p>
+                    <ul>
+                        <li>Review the detailed results above</li>
+                        <li>Check attached log file for complete details</li>
+                        <li>Contact the development team for any critical failures</li>
+                    </ul>
+                </div>
+                
+                <div class="timestamp">
+                    <p>Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                    <p>This is an automated message - please do not reply directly</p>
+                </div>
             </div>
         </div>
     </body>
