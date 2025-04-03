@@ -9,929 +9,504 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- Chart.js -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.css">
-    <!-- DataTables -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
     <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- Local Fonts -->
     <style>
-        /* [Previous CSS styles remain the same] */
-        
-        /* New styles for reports */
-        .report-container {
-            background-color: white;
-            border-radius: 10px;
+        @font-face {
+            font-family: 'Roboto';
+            src: url('{{ url_for('static', filename='fonts/Roboto-Regular.ttf') }}') format('truetype');
+            font-weight: 400;
+        }
+
+        @font-face {
+            font-family: 'Roboto';
+            src: url('{{ url_for('static', filename='fonts/Roboto-Medium.ttf') }}') format('truetype');
+            font-weight: 500;
+        }
+
+        @font-face {
+            font-family: 'Roboto';
+            src: url('{{ url_for('static', filename='fonts/Roboto-Bold.ttf') }}') format('truetype');
+            font-weight: 700;
+        }
+
+        body {
+            background-color: #f4f4f4;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .card {
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            margin-bottom: 20px;
+            border-radius: 10px;
+            transition: transform 0.3s, box-shadow 0.3s;
         }
-        
-        .screenshot-thumbnail {
-            width: 100%;
-            height: 150px;
-            object-fit: cover;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: transform 0.3s;
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
         }
-        
-        .screenshot-thumbnail:hover {
-            transform: scale(1.05);
-        }
-        
-        .modal-screenshot {
-            max-width: 100%;
-            max-height: 80vh;
-        }
-        
-        .timing-table th {
-            background-color: #f8f9fa;
-            position: sticky;
-            top: 0;
-        }
-        
-        .tab-content {
-            padding: 20px 0;
-        }
-        
-        .export-btn {
-            margin-left: 10px;
-        }
-        
-        .performance-chart-container {
-            height: 300px;
-            margin-bottom: 30px;
-        }
-        
-        .metric-card {
-            border-left: 4px solid #007bff;
-            margin-bottom: 15px;
-        }
-        
-        .metric-card .card-body {
-            padding: 15px;
-        }
-        
-        .metric-value {
-            font-size: 24px;
+
+        .form-label {
             font-weight: bold;
         }
-        
-        .metric-label {
-            color: #6c757d;
+
+        .form-select option {
+            font-weight: bold;
+        }
+
+        /* Button styles */
+        .btn-hover {
+            width: 250px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            margin: 20px 25px;
+            height: 65px;
+            text-align: center;
+            border: none;
+            background-size: 300% 100%;
+            border-radius: 50px;
+            transition: all 0.4s ease-in-out;
+        }
+
+        .btn-hover:hover {
+            background-position: 100% 0;
+            transition: all 0.4s ease-in-out;
+        }
+
+        .btn-hover:focus {
+            outline: none;
+        }
+
+        .color-start {
+            background-image: linear-gradient(to right, #067645, #3cba92, #30dd8a, #2bb673);
+            box-shadow: 0 4px 15px 0 rgba(23, 168, 108, 0.75);
+        }
+
+        .color-pause {
+            background-image: linear-gradient(to right, #6253e1, #852D91, #A3A1FF, #F24645);
+            box-shadow: 0 4px 15px 0 rgba(126, 52, 161, 0.75);
+        }
+
+        .color-stop {
+            background-image: linear-gradient(to right, #eb3941, #f15e64, #e14e53, #e2373f);
+            box-shadow: 0 5px 15px rgba(242, 97, 103, .75);
+        }
+
+        /* Report Button */
+        .color-report {
+            background-image: linear-gradient(to right, #6a11cb, #2575fc);
+            box-shadow: 0 4px 15px 0 rgba(106, 17, 203, 0.75);
+        }
+
+        /* Submit Button */
+        .submit-btn {
+            background-image: linear-gradient(to right, #ff7e5f, #feb47b);
+            color: #fff;
+            border-radius: 30px;
+            border: none;
+            height: 45px;
+            width: 150px;
+            cursor: pointer;
+            font-weight: 600;
             font-size: 14px;
+            transition: background 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            background-image: linear-gradient(to right, #feb47b, #ff7e5f);
+        }
+
+        /* Progress bar styles */
+        .progress-bar {
+            background: linear-gradient(45deg, #007bff, #00c6ff);
+            transition: width 1s ease-in-out;
+        }
+
+        /* Loader styles */
+        .dot-loader-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            height: 100px;
+        }
+
+        .dot-loader {
+            display: inline-block;
+            position: relative;
+            width: 80px;
+            height: 6px;
+        }
+
+        .dot-loader div {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #007bff;
+            animation-timing-function: cubic-bezier(0, 1, 1, 0);
+        }
+
+        .dot-loader div:nth-child(1) {
+            left: 8px;
+            animation: dot-loader1 0.6s infinite;
+        }
+
+        .dot-loader div:nth-child(2) {
+            left: 8px;
+            animation: dot-loader2 0.6s infinite;
+        }
+
+        .dot-loader div:nth-child(3) {
+            left: 32px;
+            animation: dot-loader2 0.6s infinite;
+        }
+
+        .dot-loader div:nth-child(4) {
+            left: 56px;
+            animation: dot-loader3 0.6s infinite;
+        }
+
+        @keyframes dot-loader1 {
+            0% {
+                transform: scale(0);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes dot-loader3 {
+            0% {
+                transform: scale(1);
+            }
+
+            100% {
+                transform: scale(0);
+            }
+        }
+
+        @keyframes dot-loader2 {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(24px, 0);
+            }
+        }
+
+        /* List styles */
+        .list-group-item {
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #f4f4f4, #e0e0e0);
+        }
+
+        .list-group-item .icon {
+            margin-right: 15px;
+        }
+
+        .list-group-item-success {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+        }
+
+        .list-group-item-danger {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+        }
+
+        .list-group-item-success .icon {
+            color: #28a745;
+        }
+
+        .list-group-item-danger .icon {
+            color: #dc3545;
+        }
+
+        .list-group-item-warning {
+            background: linear-gradient(135deg, #fff3cd, #ffeeba);
+            color: #856404;
+        }
+
+        .list-group-item-warning .icon {
+            color: #ffc107;
+        }
+
+        .tooltip-inner {
+            background-color: #007bff !important;
+            color: #fff;
+        }
+
+        .tooltip-arrow {
+            border-bottom-color: #007bff !important;
+        }
+
+        .disabled-list {
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        /* Report button container */
+        .report-button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
         }
     </style>
 </head>
 
 <body>
     <div class="container-fluid">
-        <!-- [Previous main content remains the same] -->
-        
-        <!-- Report Modal -->
-        <div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="reportModalLabel">Validation Report</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="report-container">
-                            <h2 class="text-center mb-4">Validation Report - <span id="reportEnvironment"></span></h2>
-                            <p class="text-center text-muted" id="reportTimestamp"></p>
-                            
-                            <ul class="nav nav-tabs" id="reportTabs" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab">Summary</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="screenshots-tab" data-bs-toggle="tab" data-bs-target="#screenshots" type="button" role="tab">Screenshots</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance" type="button" role="tab">Performance</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button" role="tab">Detailed Logs</button>
-                                </li>
-                            </ul>
-                            
-                            <div class="tab-content" id="reportTabContent">
-                                <!-- Summary Tab -->
-                                <div class="tab-pane fade show active" id="summary" role="tabpanel">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="card mb-4">
-                                                <div class="card-header bg-primary text-white">
-                                                    Validation Overview
-                                                </div>
-                                                <div class="card-body">
-                                                    <canvas id="summaryChart"></canvas>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="card mb-4">
-                                                <div class="card-header bg-primary text-white">
-                                                    Key Metrics
-                                                </div>
-                                                <div class="card-body">
-                                                    <div class="row">
-                                                        <div class="col-md-6 mb-3">
-                                                            <div class="card metric-card">
-                                                                <div class="card-body">
-                                                                    <div class="metric-value" id="totalChecks">0</div>
-                                                                    <div class="metric-label">Total Checks</div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-md-6 mb-3">
-                                                            <div class="card metric-card">
-                                                                <div class="card-body">
-                                                                    <div class="metric-value text-success" id="successChecks">0</div>
-                                                                    <div class="metric-label">Successful</div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-md-6 mb-3">
-                                                            <div class="card metric-card">
-                                                                <div class="card-body">
-                                                                    <div class="metric-value text-danger" id="failedChecks">0</div>
-                                                                    <div class="metric-label">Failed</div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-md-6 mb-3">
-                                                            <div class="card metric-card">
-                                                                <div class="card-body">
-                                                                    <div class="metric-value text-warning" id="skippedChecks">0</div>
-                                                                    <div class="metric-label">Skipped</div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="row mt-3">
-                                                        <div class="col-md-6">
-                                                            <div class="card metric-card">
-                                                                <div class="card-body">
-                                                                    <div class="metric-value" id="totalTime">0s</div>
-                                                                    <div class="metric-label">Total Duration</div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <div class="card metric-card">
-                                                                <div class="card-body">
-                                                                    <div class="metric-value" id="avgTime">0s</div>
-                                                                    <div class="metric-label">Avg. Check Time</div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-12">
-                                            <div class="card">
-                                                <div class="card-header bg-primary text-white">
-                                                    Validation Timeline
-                                                </div>
-                                                <div class="card-body">
-                                                    <canvas id="timelineChart"></canvas>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Screenshots Tab -->
-                                <div class="tab-pane fade" id="screenshots" role="tabpanel">
-                                    <div class="row" id="screenshotGallery">
-                                        <!-- Screenshots will be populated here -->
-                                    </div>
-                                </div>
-                                
-                                <!-- Performance Tab -->
-                                <div class="tab-pane fade" id="performance" role="tabpanel">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="performance-chart-container">
-                                                <h4>Component Load Times</h4>
-                                                <canvas id="componentTimingChart"></canvas>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="performance-chart-container">
-                                                <h4>Performance Distribution</h4>
-                                                <canvas id="performanceDistributionChart"></canvas>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-12">
-                                            <h4 class="mt-4">Detailed Timing Data</h4>
-                                            <div class="table-responsive">
-                                                <table class="table table-striped timing-table" id="timingDataTable">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Component</th>
-                                                            <th>Type</th>
-                                                            <th>Duration (ms)</th>
-                                                            <th>Status</th>
-                                                            <th>Timestamp</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <!-- Timing data will be populated here -->
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Details Tab -->
-                                <div class="tab-pane fade" id="details" role="tabpanel">
-                                    <div class="table-responsive">
-                                        <table class="table table-striped" id="detailedLogsTable">
-                                            <thead>
-                                                <tr>
-                                                    <th>#</th>
-                                                    <th>Timestamp</th>
-                                                    <th>Message</th>
-                                                    <th>Status</th>
-                                                    <th>Duration</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <!-- Detailed logs will be populated here -->
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
+        <div class="row mt-5">
+            <!-- Left Column -->
+            <div class="col-md-8">
+                <div class="card p-4 mb-4">
+                    <h1 class="text-center mb-4">FPA Validation</h1>
+                    <form id="validationForm">
+                        <div class="form-group mb-4">
+                            <label for="environment" class="form-label" data-bs-toggle="tooltip" data-bs-placement="right" title="Select the environment for validation">Select Environment:</label>
+                            <select class="form-select" id="environment" name="environment">
+                                <option value="IT">IT</option>
+                                <option value="QV">QV</option>
+                                <option value="Prod">Prod</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-4">
+                            <label for="validationPortalLink" class="form-label">Validation Portal Link (Optional):</label>
+                            <div class="input-group">
+                                <input type="url" class="form-control" id="validationPortalLink" name="validationPortalLink" placeholder="Enter the validation portal link">
+                                <button type="button" class="submit-btn" onclick="submitPortalLink()">Submit</button>
                             </div>
                         </div>
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn-hover color-start" data-bs-toggle="tooltip" data-bs-placement="top" title="Start the validation process">Start Validation <i class="fas fa-play ms-2"></i></button>
+                            <button type="button" id="pauseBtn" class="btn-hover color-pause" data-bs-toggle="tooltip" data-bs-placement="top" title="Pause the validation process">Pause Validation <i class="fas fa-pause ms-2"></i></button>
+                            <button type="button" id="stopBtn" class="btn-hover color-stop" data-bs-toggle="tooltip" data-bs-placement="top" title="Stop the validation process">Stop Validation <i class="fas fa-stop ms-2"></i></button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card p-4" id="statusContainer">
+                    <h2 class="text-center">Status: <span id="statusText">Not Started</span></h2>
+                    <div class="progress mt-4">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" role="progressbar" style="width: 0%;"></div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="button" class="btn btn-primary export-btn" onclick="exportReport('pdf')">
-                            <i class="fas fa-file-pdf"></i> Export as PDF
-                        </button>
-                        <button type="button" class="btn btn-primary export-btn" onclick="exportReport('html')">
-                            <i class="fas fa-file-code"></i> Export as HTML
+                    <ul id="statusList" class="list-group list-group-flush mt-4"></ul>
+                    <div class="dot-loader-container" id="loaderContainer" style="display: none;">
+                        <div class="dot-loader"><div></div><div></div><div></div><div></div></div>
+                    </div>
+                    
+                    <!-- Add Report Button -->
+                    <div class="report-button-container">
+                        <button type="button" id="reportBtn" class="btn-hover color-report" 
+                                data-bs-toggle="tooltip" data-bs-placement="top" 
+                                title="Generate validation report"
+                                style="display: none;">
+                            Generate Report <i class="fas fa-file-alt ms-2"></i>
                         </button>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- Screenshot Modal -->
-        <div class="modal fade" id="screenshotModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Screenshot</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body text-center">
-                        <img src="" class="modal-screenshot" id="modalScreenshot">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="button" class="btn btn-primary" onclick="downloadScreenshot()">
-                            <i class="fas fa-download"></i> Download
-                        </button>
-                    </div>
+
+            <!-- Right Column -->
+            <div class="col-md-4">
+                <div class="card p-4">
+                    <h2 class="text-center">Validation Progress</h2>
+                    <canvas id="statusChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript Libraries -->
+    <!-- Bootstrap 5 JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Local jQuery -->
     <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
-        // [Previous JavaScript code remains the same until the end of the document.ready function]
-        
-        // Add these new functions after the existing code:
-        
-        // Performance tracking object
-        const performanceMetrics = {
-            timings: [],
-            startTimes: {},
-            componentStats: {},
+        $(document).ready(function () {
+            $('[data-bs-toggle="tooltip"]').tooltip();
+            let isPaused = false;
+            let chart;
+            let intervalId;
+            const ctx = document.getElementById('statusChart').getContext('2d');
             
-            startTimer: function(componentId, componentType) {
-                this.startTimes[componentId] = performance.now();
-                return componentId;
-            },
-            
-            endTimer: function(componentId, status) {
-                if (!this.startTimes[componentId]) return null;
-                
-                const endTime = performance.now();
-                const duration = endTime - this.startTimes[componentId];
-                const timestamp = new Date().toISOString();
-                
-                const timingData = {
-                    id: componentId,
-                    type: componentType || 'element',
-                    duration: duration,
-                    status: status || 'success',
-                    timestamp: timestamp
-                };
-                
-                this.timings.push(timingData);
-                
-                // Update component statistics
-                if (!this.componentStats[componentId]) {
-                    this.componentStats[componentId] = {
-                        count: 0,
-                        total: 0,
-                        min: Infinity,
-                        max: 0,
-                        successes: 0,
-                        failures: 0
-                    };
-                }
-                
-                const stats = this.componentStats[componentId];
-                stats.count++;
-                stats.total += duration;
-                stats.min = Math.min(stats.min, duration);
-                stats.max = Math.max(stats.max, duration);
-                
-                if (status === 'success') {
-                    stats.successes++;
-                } else {
-                    stats.failures++;
-                }
-                
-                return timingData;
-            },
-            
-            getComponentStats: function(componentId) {
-                if (!this.componentStats[componentId]) return null;
-                
-                const stats = this.componentStats[componentId];
-                return {
-                    id: componentId,
-                    count: stats.count,
-                    total: stats.total,
-                    average: stats.total / stats.count,
-                    min: stats.min,
-                    max: stats.max,
-                    successRate: (stats.successes / stats.count) * 100
-                };
-            },
-            
-            getAllStats: function() {
-                return Object.keys(this.componentStats).map(id => this.getComponentStats(id));
-            },
-            
-            getSummary: function() {
-                const total = this.timings.length;
-                const success = this.timings.filter(t => t.status === 'success').length;
-                const failed = this.timings.filter(t => t.status === 'failed').length;
-                const totalTime = this.timings.reduce((sum, t) => sum + t.duration, 0);
-                const avgTime = total > 0 ? totalTime / total : 0;
-                
-                return {
-                    totalChecks: total,
-                    successChecks: success,
-                    failedChecks: failed,
-                    skippedChecks: total - success - failed,
-                    totalTime: totalTime,
-                    avgTime: avgTime
-                };
-            }
-        };
-        
-        // Report generation functions
-        function generateReport() {
-            const reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
-            const summary = performanceMetrics.getSummary();
-            
-            // Set basic report info
-            $('#reportEnvironment').text($('#environment').val());
-            $('#reportTimestamp').text(new Date().toLocaleString());
-            
-            // Update summary metrics
-            $('#totalChecks').text(summary.totalChecks);
-            $('#successChecks').text(summary.successChecks);
-            $('#failedChecks').text(summary.failedChecks);
-            $('#skippedChecks').text(summary.totalChecks - summary.successChecks - summary.failedChecks);
-            $('#totalTime').text((summary.totalTime / 1000).toFixed(2) + 's');
-            $('#avgTime').text((summary.avgTime / 1000).toFixed(2) + 's');
-            
-            // Initialize charts
-            initSummaryChart();
-            initTimelineChart();
-            initComponentTimingChart();
-            initPerformanceDistributionChart();
-            
-            // Load screenshots
-            loadScreenshots();
-            
-            // Initialize data tables
-            initTimingDataTable();
-            initDetailedLogsTable();
-            
-            // Show the modal
-            reportModal.show();
-        }
-        
-        function initSummaryChart() {
-            const summary = performanceMetrics.getSummary();
-            const ctx = document.getElementById('summaryChart').getContext('2d');
-            
-            new Chart(ctx, {
+            // Initialize chart with zero values
+            chart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: ['Success', 'Failed', 'Skipped'],
                     datasets: [{
-                        data: [summary.successChecks, summary.failedChecks, summary.skippedChecks],
+                        data: [0, 0, 0],
                         backgroundColor: ['#28a745', '#dc3545', '#ffc107'],
-                        borderWidth: 1
                     }]
                 },
                 options: {
                     responsive: true,
                     plugins: {
                         legend: {
-                            position: 'bottom'
+                            position: 'bottom',
                         },
                         tooltip: {
                             callbacks: {
-                                label: function(context) {
-                                    const label = context.label || '';
-                                    const value = context.raw || 0;
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = Math.round((value / total) * 100);
-                                    return `${label}: ${value} (${percentage}%)`;
+                                label: function (context) {
+                                    return `${context.label}: ${context.raw}`;
                                 }
                             }
                         }
+                    },
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true
                     }
                 }
             });
-        }
-        
-        function initTimelineChart() {
-            const ctx = document.getElementById('timelineChart').getContext('2d');
-            const timings = performanceMetrics.timings;
-            
-            // Group by time intervals (e.g., every 5 seconds)
-            const timeGroups = {};
-            const interval = 5000; // 5 seconds
-            
-            timings.forEach(timing => {
-                const time = new Date(timing.timestamp).getTime();
-                const group = Math.floor(time / interval) * interval;
-                
-                if (!timeGroups[group]) {
-                    timeGroups[group] = {
-                        time: new Date(group),
-                        success: 0,
-                        failed: 0,
-                        skipped: 0
-                    };
-                }
-                
-                if (timing.status === 'success') {
-                    timeGroups[group].success++;
-                } else if (timing.status === 'failed') {
-                    timeGroups[group].failed++;
+
+            function updateChart(success, failed, skipped) {
+                chart.data.datasets[0].data = [success, failed, skipped];
+                chart.update();
+            }
+
+            function submitPortalLink() {
+                const validationPortalLink = $('#validationPortalLink').val();
+                if (validationPortalLink) {
+                    alert('Validation portal link submitted successfully!');
                 } else {
-                    timeGroups[group].skipped++;
+                    alert('Please enter a valid validation portal link.');
                 }
-            });
-            
-            const groups = Object.values(timeGroups).sort((a, b) => a.time - b.time);
-            
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: groups.map(g => g.time.toLocaleTimeString()),
-                    datasets: [
-                        {
-                            label: 'Success',
-                            data: groups.map(g => g.success),
-                            borderColor: '#28a745',
-                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                            tension: 0.1,
-                            fill: true
-                        },
-                        {
-                            label: 'Failed',
-                            data: groups.map(g => g.failed),
-                            borderColor: '#dc3545',
-                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                            tension: 0.1,
-                            fill: true
-                        },
-                        {
-                            label: 'Skipped',
-                            data: groups.map(g => g.skipped),
-                            borderColor: '#ffc107',
-                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
-                            tension: 0.1,
-                            fill: true
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Number of Checks'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Time'
-                            }
-                        }
-                    },
-                    plugins: {
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false
-                        }
-                    }
-                }
-            });
-        }
-        
-        function initComponentTimingChart() {
-            const ctx = document.getElementById('componentTimingChart').getContext('2d');
-            const stats = performanceMetrics.getAllStats();
-            
-            // Sort by average time descending
-            stats.sort((a, b) => b.average - a.average);
-            
-            // Take top 10 components
-            const topComponents = stats.slice(0, 10);
-            
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: topComponents.map(c => c.id),
-                    datasets: [
-                        {
-                            label: 'Average Time (ms)',
-                            data: topComponents.map(c => c.average),
-                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'Min Time (ms)',
-                            data: topComponents.map(c => c.min),
-                            backgroundColor: 'rgba(75, 192, 192, 0.7)',
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'Max Time (ms)',
-                            data: topComponents.map(c => c.max),
-                            backgroundColor: 'rgba(255, 99, 132, 0.7)',
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Time (ms)'
-                            }
-                        }
-                    },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                afterLabel: function(context) {
-                                    const index = context.dataIndex;
-                                    const stat = topComponents[index];
-                                    return [
-                                        `Success Rate: ${stat.successRate.toFixed(1)}%`,
-                                        `Total Checks: ${stat.count}`
-                                    ];
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-        
-        function initPerformanceDistributionChart() {
-            const ctx = document.getElementById('performanceDistributionChart').getContext('2d');
-            const timings = performanceMetrics.timings.map(t => t.duration);
-            
-            // Create bins for histogram
-            const maxTime = Math.max(...timings);
-            const binSize = Math.ceil(maxTime / 20);
-            const bins = Array(Math.ceil(maxTime / binSize)).fill(0);
-            
-            timings.forEach(time => {
-                const binIndex = Math.floor(time / binSize);
-                bins[binIndex]++;
-            });
-            
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: bins.map((_, i) => `${i * binSize}-${(i + 1) * binSize} ms`),
-                    datasets: [{
-                        label: 'Number of Checks',
-                        data: bins,
-                        backgroundColor: 'rgba(153, 102, 255, 0.7)',
-                        borderColor: 'rgba(153, 102, 255, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Number of Checks'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Duration Range (ms)'
-                            }
-                        }
-                    }
-                }
-            });
-        }
-        
-        function loadScreenshots() {
-            $.get('/screenshots', function(data) {
-                const gallery = $('#screenshotGallery');
-                gallery.empty();
-                
-                if (data.screenshots.length === 0) {
-                    gallery.html('<div class="col-12 text-center text-muted">No screenshots available</div>');
-                    return;
-                }
-                
-                data.screenshots.forEach(screenshot => {
-                    const col = $(`
-                        <div class="col-md-4 col-sm-6 mb-4">
-                            <div class="card">
-                                <img src="${screenshot.path}" class="card-img-top screenshot-thumbnail" 
-                                     alt="${screenshot.filename}" data-src="${screenshot.path}">
-                                <div class="card-body">
-                                    <h6 class="card-title">${screenshot.filename}</h6>
-                                    <p class="card-text text-muted small">${screenshot.created}</p>
-                                </div>
-                            </div>
-                        </div>
-                    `);
+            }
+
+            function fetchStatus() {
+                $.get('/status', function (data) {
+                    $('#statusText').text(data.status);
+                    $('#statusList').empty();
                     
-                    col.find('img').click(function() {
-                        $('#modalScreenshot').attr('src', $(this).data('src'));
-                        new bootstrap.Modal(document.getElementById('screenshotModal')).show();
+                    // Use actual counts from the backend
+                    const successCount = data.successful_checks;
+                    const failedCount = data.failed_checks;
+                    const skippedCount = data.skipped_checks;
+
+                    // Update progress bar with actual progress value
+                    $('#progressBar').css('width', data.progress + '%');
+
+                    // Update results list
+                    data.results.forEach((result, index) => {
+                        const listItem = $('<li>').addClass('list-group-item d-flex justify-content-between align-items-center');
+                        const icon = $('<i>').addClass('fas fa-check-circle icon');
+                        listItem.text(result);
+                        
+                        // Determine status based on result content
+                        if (result.includes('[Failed]')) {
+                            listItem.addClass('list-group-item-danger');
+                            icon.removeClass('fa-check-circle').addClass('fa-times-circle');
+                        } else if (result.includes('[Skipped]') || result.includes('[Warning]')) {
+                            listItem.addClass('list-group-item-warning');
+                            icon.removeClass('fa-check-circle').addClass('fa-minus-circle');
+                        } else {
+                            listItem.addClass('list-group-item-success');
+                        }
+                        
+                        listItem.prepend(icon);
+                        const statusBadge = $('<span>').addClass('badge bg-secondary rounded-pill');
+                        statusBadge.text(index + 1);
+                        listItem.append(statusBadge);
+                        $('#statusList').append(listItem);
                     });
-                    
-                    gallery.append(col);
-                });
-            });
-        }
-        
-        function initTimingDataTable() {
-            $('#timingDataTable').DataTable({
-                data: performanceMetrics.timings,
-                columns: [
-                    { data: 'id', title: 'Component' },
-                    { data: 'type', title: 'Type' },
-                    { 
-                        data: 'duration', 
-                        title: 'Duration (ms)',
-                        render: function(data) {
-                            return data.toFixed(2);
-                        }
-                    },
-                    { 
-                        data: 'status', 
-                        title: 'Status',
-                        render: function(data) {
-                            const badgeClass = data === 'success' ? 'badge bg-success' : 
-                                             data === 'failed' ? 'badge bg-danger' : 'badge bg-warning';
-                            return `<span class="${badgeClass}">${data}</span>`;
-                        }
-                    },
-                    { data: 'timestamp', title: 'Timestamp' }
-                ],
-                order: [[4, 'desc']],
-                pageLength: 10
-            });
-        }
-        
-        function initDetailedLogsTable() {
-            $('#detailedLogsTable').DataTable({
-                data: validation_status.results.map((result, index) => {
-                    return {
-                        index: index + 1,
-                        message: result,
-                        timestamp: new Date().toISOString(),
-                        status: result.includes('[Failed]') ? 'Failed' : 
-                               result.includes('[Skipped]') ? 'Skipped' : 'Success',
-                        duration: 'N/A'
-                    };
-                }),
-                columns: [
-                    { data: 'index', title: '#' },
-                    { data: 'timestamp', title: 'Timestamp' },
-                    { data: 'message', title: 'Message' },
-                    { 
-                        data: 'status', 
-                        title: 'Status',
-                        render: function(data) {
-                            const badgeClass = data === 'Success' ? 'badge bg-success' : 
-                                             data === 'Failed' ? 'badge bg-danger' : 'badge bg-warning';
-                            return `<span class="${badgeClass}">${data}</span>`;
-                        }
-                    },
-                    { data: 'duration', title: 'Duration' }
-                ],
-                order: [[0, 'asc']],
-                pageLength: 10
-            });
-        }
-        
-        function downloadScreenshot() {
-            const src = $('#modalScreenshot').attr('src');
-            const link = document.createElement('a');
-            link.href = src;
-            link.download = src.split('/').pop();
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-        
-        function exportReport(format) {
-            if (format === 'pdf') {
-                // Use html2canvas and jsPDF to generate PDF
-                const element = document.getElementById('reportModal');
-                
-                html2canvas(element, {
-                    scale: 2,
-                    logging: true,
-                    useCORS: true
-                }).then(canvas => {
-                    const imgData = canvas.toDataURL('image/png');
-                    const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
-                    const imgWidth = 210; // A4 width in mm
-                    const pageHeight = 295; // A4 height in mm
-                    const imgHeight = canvas.height * imgWidth / canvas.width;
-                    let heightLeft = imgHeight;
-                    let position = 0;
-                    
-                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                    heightLeft -= pageHeight;
-                    
-                    while (heightLeft >= 0) {
-                        position = heightLeft - imgHeight;
-                        pdf.addPage();
-                        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                        heightLeft -= pageHeight;
+
+                    // Update chart with actual counts from backend
+                    updateChart(successCount, failedCount, skippedCount);
+
+                    // Handle completion states
+                    if (data.status === 'Completed' || data.status === 'Failed' || data.status === 'Stopped') {
+                        clearInterval(intervalId);
+                        $('#loaderContainer').hide();
+                        $('#progressBar').css('width', '100%');
+                        $('#progressBar').removeClass('progress-bar-animated');
+                        
+                        // Show report button when validation is complete
+                        $('#reportBtn').show();
                     }
-                    
-                    pdf.save('validation_report.pdf');
+                }).fail(function() {
+                    console.error('Failed to fetch status');
                 });
-            } else if (format === 'html') {
-                // Create a downloadable HTML file
-                const htmlContent = `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>Validation Report</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; margin: 20px; }
-                            .report-section { margin-bottom: 30px; }
-                            .chart-container { width: 100%; height: 400px; margin: 20px 0; }
-                            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                            th { background-color: #f2f2f2; }
-                            .screenshot { max-width: 100%; margin: 10px 0; }
-                        </style>
-                    </head>
-                    <body>
-                        <h1>Validation Report</h1>
-                        <p>Generated on: ${new Date().toLocaleString()}</p>
-                        
-                        <!-- You would need to implement functions to convert charts to images -->
-                        <!-- For simplicity, we're just including the data tables -->
-                        
-                        <div class="report-section">
-                            <h2>Timing Data</h2>
-                            ${document.getElementById('timingDataTable').outerHTML}
-                        </div>
-                        
-                        <div class="report-section">
-                            <h2>Detailed Logs</h2>
-                            ${document.getElementById('detailedLogsTable').outerHTML}
-                        </div>
-                    </body>
-                    </html>
-                `;
+            }
+
+            $('#validationForm').submit(function (e) {
+                e.preventDefault();
+                const environment = $('#environment').val();
+                const validationPortalLink = $('#validationPortalLink').val();
+                $('#statusContainer').show();
+                $('#statusText').text('Running');
+                $('#progressBar').css('width', '0%');
+                $('#progressBar').addClass('progress-bar-animated');
+                $('#statusList').empty();
+                $('#loaderContainer').show();
+                $('#reportBtn').hide(); // Hide report button when starting new validation
+
+                $.ajax({
+                    url: '/start_validation',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ environment, validation_portal_link: validationPortalLink }),
+                    success: function (response) {
+                        // Start polling for status updates
+                        intervalId = setInterval(fetchStatus, 2000);
+                    },
+                    error: function (error) {
+                        console.error('Error starting validation:', error);
+                        $('#statusText').text('Failed to Start');
+                        $('#loaderContainer').hide();
+                    }
+                });
+            });
+
+            $('#pauseBtn').click(function () {
+                if (isPaused) {
+                    $.post('/pause_resume_validation', function () {
+                        $('#pauseBtn').html('Pause Validation <i class="fas fa-pause ms-2"></i>');
+                        $('#statusText').text('Running');
+                        isPaused = false;
+                    });
+                } else {
+                    $.post('/pause_resume_validation', function () {
+                        $('#pauseBtn').html('Resume Validation <i class="fas fa-play ms-2"></i>');
+                        $('#statusText').text('Paused');
+                        isPaused = true;
+                    });
+                }
+            });
+
+            $('#stopBtn').click(function () {
+                $.post('/stop_validation', function () {
+                    $('#statusText').text('Stopped');
+                    $('#loaderContainer').hide();
+                    clearInterval(intervalId);
+                    $('#progressBar').css('width', '100%');
+                    $('#progressBar').removeClass('progress-bar-animated');
+                    $('#reportBtn').show(); // Show report button when stopped
+                });
+            });
+
+            // Report button click handler
+            $('#reportBtn').click(function() {
+                // Open report in new tab
+                window.open('/generate_report', '_blank');
                 
-                const blob = new Blob([htmlContent], { type: 'text/html' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = 'validation_report.html';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            }
-        }
-        
-        // Modify the validation functions to track performance
-        function validate_application(environment, validation_portal_link, retry_failed) {
-            // Track overall validation time
-            const validationTimer = performanceMetrics.startTimer('full_validation', 'process');
-            
-            // [Existing validation code...]
-            
-            // At the end of validation:
-            performanceMetrics.endTimer('full_validation', all_tabs_opened ? 'success' : 'failed');
-            
-            // Generate report when complete
-            if (data.status === 'Completed' || data.status === 'Failed') {
-                generateReport();
-            }
-            
-            return validation_results, all_tabs_opened;
-        }
-        
-        function check_tab(tab_element, tab_name, content_locator, index) {
-            const timerId = performanceMetrics.startTimer(`tab_${tab_name}`, 'tab');
-            
-            try {
-                // [Existing tab checking code...]
-                
-                performanceMetrics.endTimer(timerId, success ? 'success' : 'failed');
-                return success;
-            } catch (error) {
-                performanceMetrics.endTimer(timerId, 'failed');
-                throw error;
-            }
-        }
-        
-        function check_sub_tab(sub_tab_js, sub_tab_name, content_locator, main_index, sub_index) {
-            const timerId = performanceMetrics.startTimer(`subtab_${sub_tab_name}`, 'subtab');
-            
-            try {
-                // [Existing sub-tab checking code...]
-                
-                performanceMetrics.endTimer(timerId, success ? 'success' : 'failed');
-                return success;
-            } catch (error) {
-                performanceMetrics.endTimer(timerId, 'failed');
-                throw error;
-            }
-        }
-        
-        function validate_first_list_element_and_cancel(column_index, main_index, sub_index, is_export_control) {
-            const timerId = performanceMetrics.startTimer(`element_${main_index}_${sub_index}`, 'element');
-            
-            try {
-                // [Existing element validation code...]
-                
-                performanceMetrics.endTimer(timerId, first_list_element_success ? 'success' : 'failed');
-                return first_list_element_success;
-            } catch (error) {
-                performanceMetrics.endTimer(timerId, 'failed');
-                throw error;
-            }
-        }
+                // Alternative: Download the report
+                // window.location.href = '/download_report';
+            });
+        });
     </script>
 </body>
 
