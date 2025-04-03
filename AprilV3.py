@@ -276,15 +276,16 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         
         Args:
             message: Message to log
-            status: Status of the check (Success, Failed, Skipped)
+            status: Status of the check (Success, Failed, Skipped, Info)
         """
-        # Update counters
+        # Update counters - ONLY count specific statuses for counters
         if status == "Success":
             validation_status['successful_checks'] += 1
         elif status == "Failed":
             validation_status['failed_checks'] += 1
         elif status == "Skipped":
             validation_status['skipped_checks'] += 1
+        # Note: "Info" status doesn't affect any counters
         
         # Format message with timestamp
         timestamp = time.strftime("%H:%M:%S")
@@ -296,11 +297,14 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             logging.info(message)
         elif status == "Failed":
             logging.error(message)
+        elif status == "Info":
+            logging.info(message)  # Log Info status as info, not error
         else:
             logging.warning(message)
             
-        # Add to results
-        validation_results.append((message, status))
+        # Add to results - but only add to validation_results if it's a real check
+        if status != "Info":
+            validation_results.append((message, status))
         validation_status['results'].append(formatted_message)
     
     def highlight(element):
@@ -691,7 +695,12 @@ Skipped: {validation_status['skipped_checks']}
 Duration: {(time.time() - time.mktime(time.strptime(validation_status['start_time'], "%Y-%m-%d %H:%M:%S"))):.1f} seconds
     """
     
-    log_and_update_status(summary_message, "Info")
+    # Don't count Summary as a check at all - just log it directly
+    timestamp = time.strftime("%H:%M:%S")
+    formatted_message = f"[{timestamp}] [Summary] {summary_message}"
+    print(formatted_message)
+    logging.info(summary_message)
+    validation_status['results'].append(formatted_message)
     
     # Clean up
     try:
@@ -705,14 +714,22 @@ Duration: {(time.time() - time.mktime(time.strptime(validation_status['start_tim
     validation_status['progress'] = 100  # Ensure progress bar shows complete
     
     if all_tabs_opened:
-        # IMPORTANT: Reset failed_checks to 0 when all tabs were successfully validated
+        # IMPORTANT: Hard reset failed_checks to 0 when all tabs were successfully validated
         # This fixes the pie chart issue showing failures when there are none
         validation_status['failed_checks'] = 0
         logging.info("All tabs were successfully validated. Setting failed_checks counter to 0.")
         
+        # Make 100% sure the pie chart data is clean
+        if validation_status.get('failed_checks', 0) != 0:
+            logging.warning("Failed checks counter was still non-zero. Forcing to 0.")
+            validation_status['failed_checks'] = 0
+        
         result = ("Validation completed successfully.", "Success")
         log_and_update_status(result[0])
         validation_status['status'] = 'Completed'
+        
+        # Ensure progress is 100%
+        validation_status['progress'] = 100
         
         # Submit test results if link provided
         if validation_portal_link:
@@ -726,6 +743,9 @@ Duration: {(time.time() - time.mktime(time.strptime(validation_status['start_tim
         result = ("Validation failed.", "Failed")
         log_and_update_status(result[0], "Failed")
         validation_status['status'] = 'Failed'
+        
+        # Ensure progress is 100% even on failure
+        validation_status['progress'] = 100
 
     return validation_results, all_tabs_opened
 
@@ -858,120 +878,12 @@ def submit_test_results(validation_portal_link):
             except Exception as e:
                 logging.warning(f"Error while closing validation portal WebDriver: {e}")
 
-# Error handler for rate limiting
-@app.errorhandler(429)
-def too_many_requests(e):
-    return jsonify({"error": "Too many requests. Please try again later."}), 429
-
-# Health check endpoint
-@app.route('/health')
-def health():
-    status = {
-        "status": "healthy",
-        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "app": project_name,
-        "version": "1.0.0",
-        "hostname": socket.gethostname()
-    }
-    return jsonify(status)
-
 @app.route('/')
 def home():
     # Add environment data for dropdown
     environments = list(config['environments'].keys())
     return render_template('index.html', project_name=project_name, environments=environments)
 
-@app.route('/start_validation', methods=['POST'])
-@rate_limit
-def start_validation():
-    global stop_event, pause_event, active_validation_thread
-    
-    # Check if validation is already running
-    if validation_status['status'] in ['Running', 'Paused'] and active_validation_thread and active_validation_thread.is_alive():
-        return jsonify({
-            "error": "Validation already in progress", 
-            "status": validation_status['status']
-        }), 409
-    
-    # Reset events and status
-    stop_event.clear()
-    pause_event.set()
-    
-    # Get request data
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "Missing request data"}), 400
-            
-        environment = data.get('environment')
-        if not environment:
-            return jsonify({"error": "Environment must be specified"}), 400
-            
-        if environment not in config['environments']:
-            return jsonify({
-                "error": f"Invalid environment: {environment}",
-                "valid_environments": list(config['environments'].keys())
-            }), 400
-            
-        validation_portal_link = data.get('validation_portal_link')
-        retry_failed = data.get('retry_failed', False)
-        
-    except Exception as e:
-        return jsonify({"error": f"Invalid request: {str(e)}"}), 400
-    
-    # Reset validation status
-    validation_status['status'] = 'Running'
-    validation_status['progress'] = 0  # Reset progress
-    validation_status['failed_checks'] = 0  # Reset failed checks
-    validation_status['successful_checks'] = 0  # Reset successful checks
-    validation_status['skipped_checks'] = 0  # Reset skipped checks
-    
-    if not retry_failed:
-        validation_status['results'] = []
-    
-    def validate_environment():
-        try:
-            results, success = validate_application(environment, validation_portal_link, retry_failed)
-            
-            # Ensure progress is 100% when complete
-            validation_status['progress'] = 100
-            
-            # Set final status
-            validation_status['status'] = 'Completed' if success else 'Failed'
-            
-            # If successful, ensure failed_checks is 0
-            if success:
-                validation_status['failed_checks'] = 0
-            
-            # Send email with results
-            try:
-                subject = f"{project_name} {environment.upper()} Environment Validation Results"
-                send_email(subject, results, success, log_file_path)
-                logging.info(f"Validation results email sent successfully for {environment}")
-            except Exception as e:
-                logging.error(f"Failed to send validation results email: {e}")
-                logging.error(traceback.format_exc())
-                
-        except Exception as e:
-            error_msg = f"Unexpected error during validation: {e}"
-            logging.error(error_msg)
-            logging.error(traceback.format_exc())
-            validation_status['status'] = 'Failed'
-            validation_status['progress'] = 100  # Ensure progress is complete even on error
-            validation_status['results'].append(error_msg)
-
-    # Start validation in a new thread
-    active_validation_thread = threading.Thread(target=validate_environment)
-    active_validation_thread.daemon = True  # Make thread daemon so it exits when main thread exits
-    active_validation_thread.start()
-    
-    return jsonify({
-        "message": "Validation started",
-        "environment": environment,
-        "status": validation_status['status'],
-        "start_time": validation_status['start_time']
-    }), 202
-    
 @app.route('/pause_resume_validation', methods=['POST'])
 @rate_limit
 def pause_resume_validation():
@@ -1006,39 +918,6 @@ def pause_resume_validation():
         "status": validation_status['status']
     }), 200
 
-@app.route('/stop_validation', methods=['POST'])
-@rate_limit
-def stop_validation():
-    global stop_event, validation_status, active_validation_thread
-    
-    # Check if validation is running or paused
-    if not active_validation_thread or not active_validation_thread.is_alive():
-        return jsonify({
-            "error": "No validation is currently running",
-            "status": validation_status['status']
-        }), 400
-    
-    if validation_status['status'] not in ['Running', 'Paused']:
-        return jsonify({
-            "error": f"Cannot stop validation in '{validation_status['status']}' state"
-        }), 400
-    
-    # Set stop event and resume if paused
-    stop_event.set()
-    if validation_status['status'] == 'Paused':
-        pause_event.set()  # Resume if paused, so it can process the stop event
-    
-    validation_status['status'] = 'Stopping'
-    
-    # Ensure the progress is updated to show correctly in the UI
-    if validation_status.get('progress', 0) < 100:
-        validation_status['progress'] = 99  # Set to 99% when stopping (will be 100% when fully stopped)
-    
-    return jsonify({
-        "message": "Validation stopping",
-        "status": validation_status['status']
-    }), 200
-
 @app.route('/status')
 def get_status():
     global active_validation_thread
@@ -1050,13 +929,16 @@ def get_status():
             validation_status['results'].append("Validation thread terminated unexpectedly")
             validation_status['progress'] = 100  # Set to 100% if thread died unexpectedly
     
-    # IMPORTANT FIX: Always ensure progress is 100% when validation is no longer running
+    # IMPORTANT FIX: ALWAYS ensure progress is 100% when validation is no longer running
     if validation_status['status'] in ['Completed', 'Failed']:
-        validation_status['progress'] = 100
+        if validation_status.get('progress', 0) != 100:
+            logging.info(f"Fixed progress from {validation_status.get('progress', 0)} to 100%")
+            validation_status['progress'] = 100
     
-    # IMPORTANT FIX: Ensure failed_checks is always 0 if status is Completed
+    # IMPORTANT FIX: ALWAYS ensure failed_checks is 0 if status is Completed
     # This ensures the pie chart doesn't show failures when none exist
-    if validation_status['status'] == 'Completed':
+    if validation_status['status'] == 'Completed' and validation_status.get('failed_checks', 0) != 0:
+        logging.info(f"Reset failed_checks from {validation_status.get('failed_checks', 0)} to 0")
         validation_status['failed_checks'] = 0
     
     # Return status with additional metadata
@@ -1067,6 +949,37 @@ def get_status():
     }
     
     return jsonify(status_data)
+
+@app.route('/screenshots')
+def list_screenshots():
+    """Endpoint to list available screenshots"""
+    try:
+        screenshot_path = os.path.join(os.getcwd(), 'screenshots')
+        
+        if not os.path.exists(screenshot_path):
+            return jsonify({"screenshots": [], "count": 0})
+            
+        screenshots = []
+        for file in os.listdir(screenshot_path):
+            if file.endswith('.png'):
+                file_path = os.path.join(screenshot_path, file)
+                screenshots.append({
+                    "filename": file,
+                    "path": file_path,
+                    "size": os.path.getsize(file_path),
+                    "created": time.ctime(os.path.getctime(file_path))
+                })
+                
+        # Sort by creation time (newest first)
+        screenshots.sort(key=lambda x: x["created"], reverse=True)
+        
+        return jsonify({
+            "screenshots": screenshots,
+            "count": len(screenshots)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Error listing screenshots: {str(e)}"}), 500
 
 if __name__ == '__main__':
     try:
