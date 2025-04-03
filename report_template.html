@@ -10,9 +10,10 @@
     .screenshot-thumbnail { cursor: pointer; transition: transform 0.2s; margin: 5px; }
     .screenshot-thumbnail:hover { transform: scale(1.05); }
     .modal-image { max-width: 100%; max-height: 80vh; }
-    .nav-tabs .nav-link.active { font-weight: bold; }
-    .timing-table th { white-space: nowrap; }
+    .nav-tabs .nav-link.active { font-weight: bold; background-color: #f8f9fa; }
     .tab-pane { padding: 15px 0; }
+    .timing-table th { white-space: nowrap; }
+    canvas { margin: 20px 0; }
   </style>
 </head>
 <body>
@@ -35,6 +36,7 @@
     </ul>
     
     <div class="tab-content">
+      <!-- Summary Tab -->
       <div class="tab-pane fade show active" id="summary">
         <div class="row">
           <div class="col-md-6">
@@ -57,6 +59,7 @@
         </div>
       </div>
       
+      <!-- Performance Tab -->
       <div class="tab-pane fade" id="performance">
         <div class="row">
           <div class="col-md-6">
@@ -85,9 +88,9 @@
               <tr>
                 <td>{{ component }}</td>
                 <td>{{ stats.count }}</td>
-                <td>{{ stats.min|round(2) }}</td>
-                <td>{{ stats.max|round(2) }}</td>
-                <td>{{ stats.avg|round(2) }}</td>
+                <td>{{ "%.2f"|format(stats.min) }}</td>
+                <td>{{ "%.2f"|format(stats.max) }}</td>
+                <td>{{ "%.2f"|format(stats.avg) }}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -95,20 +98,23 @@
         </div>
       </div>
       
+      <!-- Screenshots Tab -->
       <div class="tab-pane fade" id="screenshots">
         <h4>Screenshot Gallery</h4>
         <div class="screenshot-gallery">
           {% for screenshot in screenshots %}
-          <img src="{{ screenshot.data_url }}" 
+          <img src="{{ screenshot.data }}" 
                class="screenshot-thumbnail img-thumbnail" 
                width="200" 
                data-bs-toggle="modal" 
                data-bs-target="#screenshotModal"
-               onclick="document.getElementById('modalImage').src='{{ screenshot.data_url }}'">
+               onclick="document.getElementById('modalImage').src='{{ screenshot.data }}';
+                        document.getElementById('modalTitle').innerText='{{ screenshot.name }}'">
           {% endfor %}
         </div>
       </div>
       
+      <!-- Detailed Results Tab -->
       <div class="tab-pane fade" id="details">
         <h4>Detailed Validation Results</h4>
         <table class="table table-striped">
@@ -123,7 +129,7 @@
           <tbody>
             {% for result in results %}
             <tr class="{% if result.status == 'Success' %}table-success{% elif result.status == 'Failed' %}table-danger{% else %}table-warning{% endif %}">
-              <td>{{ loop.index }}</td>
+              <td>{{ result.index }}</td>
               <td>{{ result.message }}</td>
               <td>{{ result.status }}</td>
               <td>{{ result.timestamp }}</td>
@@ -139,19 +145,31 @@
       <div class="modal-dialog modal-xl">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Screenshot</h5>
+            <h5 class="modal-title" id="modalTitle">Screenshot</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body text-center">
             <img id="modalImage" class="modal-image">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
           </div>
         </div>
       </div>
     </div>
   </div>
   
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+      // Initialize Bootstrap tabs
+      var tabElms = document.querySelectorAll('a[data-bs-toggle="tab"]');
+      tabElms.forEach(function(tabEl) {
+        tabEl.addEventListener('shown.bs.tab', function (event) {
+          // Handle tab change if needed
+        });
+      });
+
       // Summary Chart
       new Chart(document.getElementById('summaryChart'), {
         type: 'doughnut',
@@ -177,8 +195,67 @@
         }
       });
       
-      // Performance Charts would be initialized here with actual data
+      // Performance Charts
+      // Component Load Times Chart
+      const componentLabels = [{% for component in component_stats.keys() %}'{{ component }}',{% endfor %}];
+      const componentData = [{% for stats in component_stats.values() %}{{ "%.2f"|format(stats.avg) }},{% endfor %}];
       
+      new Chart(document.getElementById('componentLoadChart'), {
+        type: 'bar',
+        data: {
+          labels: componentLabels,
+          datasets: [{
+            label: 'Average Load Time (ms)',
+            data: componentData,
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Time (ms)'
+              }
+            }
+          }
+        }
+      });
+      
+      // Interaction Times Chart
+      const interactionLabels = [{% for interaction in interaction_timings %}'{{ interaction.name }}',{% endfor %}];
+      const interactionData = [{% for interaction in interaction_timings %}{{ "%.2f"|format(interaction.duration) }},{% endfor %}];
+      
+      new Chart(document.getElementById('interactionChart'), {
+        type: 'bar',
+        data: {
+          labels: interactionLabels,
+          datasets: [{
+            label: 'Interaction Time (ms)',
+            data: interactionData,
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Time (ms)'
+              }
+            }
+          }
+        }
+      });
+
       // Export functionality
       document.getElementById('exportReport').addEventListener('click', function() {
         const html = document.documentElement.outerHTML;
@@ -186,7 +263,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `validation_report_${new Date().toISOString().slice(0,10)}.html`;
+        a.download = `validation_report_{{ datetime.now().date() }}.html`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
