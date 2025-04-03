@@ -103,7 +103,6 @@ def rate_limit(func):
         return func(*args, **kwargs)
     return wrapper
 
-
 def setup_driver():
     """Set up and configure the WebDriver with proper options"""
     options = Options()
@@ -208,7 +207,6 @@ def click_element_with_retry(element, max_attempts=3):
             
     return False
 
-
 def validate_application(environment, validation_portal_link=None, retry_failed=False):
     """
     Main validation function to test the application in the specified environment
@@ -269,8 +267,8 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         return [], False
     
     validation_results = []
-
-def log_and_update_status(message, status="Success"):
+    
+    def log_and_update_status(message, status="Success"):
         """
         Log a message and update the validation status
         
@@ -518,56 +516,7 @@ def log_and_update_status(message, status="Success"):
             result = f"{main_index}.{chr(96 + sub_index)}. Unexpected error: {str(e)}. Skipping."
             log_and_update_status(result, "Warning")
             return True
-
-    # Set page load timeout
-    driver.set_page_load_timeout(30)
-    
-    # Implement exception handling with cleanup
-    try:
-        # Safely navigate to URL with retry logic
-        navigation_attempts = 0
-        max_navigation_attempts = 3
-        navigation_success = False
-        
-        while navigation_attempts < max_navigation_attempts and not navigation_success:
-            try:
-                driver.get(url)
-                WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
-                logging.info(f"Successfully navigated to {url}")
-                validation_status['results'].append(f"Successfully navigated to {url}")
-                navigation_success = True
-            except (WebDriverException, TimeoutException) as e:
-                navigation_attempts += 1
-                if navigation_attempts == max_navigation_attempts:
-                    raise
-                logging.warning(f"Navigation attempt {navigation_attempts} failed: {e}, retrying...")
-                time.sleep(2)
-                
-        if not navigation_success:
-            raise TimeoutException(f"Failed to navigate to {url} after {max_navigation_attempts} attempts")
-        
-        # Add screenshot capture on successful login
-        try:
-            screenshot_path = os.path.join(os.getcwd(), 'screenshots')
-            os.makedirs(screenshot_path, exist_ok=True)
-            screenshot_file = os.path.join(screenshot_path, f"{environment}_login_{time.strftime('%Y%m%d_%H%M%S')}.png")
-            driver.save_screenshot(screenshot_file)
-            logging.info(f"Login screenshot saved to {screenshot_file}")
-        except Exception as e:
-            logging.warning(f"Failed to capture login screenshot: {e}")
-    
-    except Exception as e:
-        error_msg = f"Failed to navigate to {url}: {e}"
-        logging.error(error_msg)
-        logging.error(traceback.format_exc())
-        validation_status['results'].append(error_msg)
-        driver.quit()
-        validation_status['status'] = 'Failed'
-        validation_status['end_time'] = time.strftime("%Y-%m-%d %H:%M:%S")
-        return validation_results, False
-
-    all_tabs_opened = True
-
+            
     def handle_sub_tabs(tab_name, sub_tabs, main_index):
         nonlocal all_tabs_opened
         sub_tab_results = []
@@ -613,6 +562,51 @@ def log_and_update_status(message, status="Success"):
                 sub_tab_results.append((result, "Failed"))
 
         return sub_tab_results
+
+    # Implement exception handling with cleanup
+    try:
+        # Safely navigate to URL with retry logic
+        navigation_attempts = 0
+        max_navigation_attempts = 3
+        navigation_success = False
+        
+        while navigation_attempts < max_navigation_attempts and not navigation_success:
+            try:
+                driver.get(url)
+                WebDriverWait(driver, 10).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+                logging.info(f"Successfully navigated to {url}")
+                validation_status['results'].append(f"Successfully navigated to {url}")
+                navigation_success = True
+            except (WebDriverException, TimeoutException) as e:
+                navigation_attempts += 1
+                if navigation_attempts == max_navigation_attempts:
+                    raise
+                logging.warning(f"Navigation attempt {navigation_attempts} failed: {e}, retrying...")
+                time.sleep(2)
+                
+        if not navigation_success:
+            raise TimeoutException(f"Failed to navigate to {url} after {max_navigation_attempts} attempts")
+        
+        # Add screenshot capture on successful login
+        try:
+            screenshot_path = os.path.join(os.getcwd(), 'screenshots')
+            os.makedirs(screenshot_path, exist_ok=True)
+            screenshot_file = os.path.join(screenshot_path, f"{environment}_login_{time.strftime('%Y%m%d_%H%M%S')}.png")
+            driver.save_screenshot(screenshot_file)
+            logging.info(f"Login screenshot saved to {screenshot_file}")
+        except Exception as e:
+            logging.warning(f"Failed to capture login screenshot: {e}")
+    
+    except Exception as e:
+        error_msg = f"Failed to navigate to {url}: {e}"
+        logging.error(error_msg)
+        logging.error(traceback.format_exc())
+        validation_status['results'].append(error_msg)
+        driver.quit()
+        validation_status['status'] = 'Failed'
+        validation_status['end_time'] = time.strftime("%Y-%m-%d %H:%M:%S")
+        validation_status['progress'] = 100
+        return validation_results, False
 
     # Loop through all tabs
     all_tabs_opened = True
@@ -670,6 +664,16 @@ def log_and_update_status(message, status="Success"):
             
         # Add a short delay between tab navigations to allow the page to stabilize
         time.sleep(2)
+
+    # Capture final screenshot
+    try:
+        screenshot_path = os.path.join(os.getcwd(), 'screenshots')
+        os.makedirs(screenshot_path, exist_ok=True)
+        screenshot_file = os.path.join(screenshot_path, f"{environment}_final_{time.strftime('%Y%m%d_%H%M%S')}.png")
+        driver.save_screenshot(screenshot_file)
+        logging.info(f"Final screenshot saved to {screenshot_file}")
+    except Exception as e:
+        logging.warning(f"Failed to capture final screenshot: {e}")
 
     # Set progress to 100% regardless of outcome
     validation_status['progress'] = 100
@@ -730,7 +734,6 @@ Duration: {(time.time() - time.mktime(time.strptime(validation_status['start_tim
     logging.info(f"Final validation status: progress={validation_status['progress']}%, failed_checks={validation_status['failed_checks']}")
 
     return validation_results, all_tabs_opened
-
 
 def submit_test_results(validation_portal_link):
     """
@@ -860,8 +863,6 @@ def submit_test_results(validation_portal_link):
             except Exception as e:
                 logging.warning(f"Error while closing validation portal WebDriver: {e}")
 
-
-
 # Error handler for rate limiting
 @app.errorhandler(429)
 def too_many_requests(e):
@@ -884,97 +885,6 @@ def home():
     # Add environment data for dropdown
     environments = list(config['environments'].keys())
     return render_template('index.html', project_name=project_name, environments=environments)
-
-@app.route('/start_validation', methods=['POST'])
-@rate_limit
-def start_validation():
-    global stop_event, pause_event, active_validation_thread, validation_status
-    
-    # Check if validation is already running
-    if validation_status['status'] in ['Running', 'Paused'] and active_validation_thread and active_validation_thread.is_alive():
-        return jsonify({
-            "error": "Validation already in progress", 
-            "status": validation_status['status']
-        }), 409
-    
-    # Reset events and status
-    stop_event.clear()
-    pause_event.set()
-    
-    # Get request data
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "Missing request data"}), 400
-            
-        environment = data.get('environment')
-        if not environment:
-            return jsonify({"error": "Environment must be specified"}), 400
-            
-        if environment not in config['environments']:
-            return jsonify({
-                "error": f"Invalid environment: {environment}",
-                "valid_environments": list(config['environments'].keys())
-            }), 400
-            
-        validation_portal_link = data.get('validation_portal_link')
-        retry_failed = data.get('retry_failed', False)
-        
-    except Exception as e:
-        return jsonify({"error": f"Invalid request: {str(e)}"}), 400
-    
-    # Reset validation status
-    validation_status['status'] = 'Running'
-    validation_status['progress'] = 0
-    validation_status['failed_checks'] = 0
-    validation_status['successful_checks'] = 0
-    validation_status['skipped_checks'] = 0
-    
-    if not retry_failed:
-        validation_status['results'] = []
-    
-    def validate_environment():
-        try:
-            results, success = validate_application(environment, validation_portal_link, retry_failed)
-            
-            # Ensure progress is 100% after completion
-            validation_status['progress'] = 100
-            validation_status['status'] = 'Completed' if success else 'Failed'
-            
-            # Reset failed_checks to 0 if successful
-            if success:
-                validation_status['failed_checks'] = 0
-                
-            # Send email with results
-            try:
-                subject = f"{project_name} {environment.upper()} Environment Validation Results"
-                send_email(subject, results, success, log_file_path)
-                logging.info(f"Validation results email sent successfully for {environment}")
-            except Exception as e:
-                logging.error(f"Failed to send validation results email: {e}")
-                logging.error(traceback.format_exc())
-                
-        except Exception as e:
-            # Ensure progress is 100% even if an error occurs
-            validation_status['progress'] = 100
-            
-            error_msg = f"Unexpected error during validation: {e}"
-            logging.error(error_msg)
-            logging.error(traceback.format_exc())
-            validation_status['status'] = 'Failed'
-            validation_status['results'].append(error_msg)
-
-    # Start validation in a new thread
-    active_validation_thread = threading.Thread(target=validate_environment)
-    active_validation_thread.daemon = True  # Make thread daemon so it exits when main thread exits
-    active_validation_thread.start()
-    
-    return jsonify({
-        "message": "Validation started",
-        "environment": environment,
-        "status": validation_status['status'],
-        "start_time": validation_status['start_time']
-    }), 202
 
 @app.route('/pause_resume_validation', methods=['POST'])
 @rate_limit
@@ -1076,66 +986,6 @@ def get_status():
     }
     
     return jsonify(status_data)
-
-@app.route('/logs')
-def get_logs():
-    """Endpoint to retrieve the most recent log entries"""
-    try:
-        num_lines = request.args.get('lines', default=100, type=int)
-        
-        if num_lines <= 0 or num_lines > 1000:
-            return jsonify({"error": "Lines parameter must be between 1 and 1000"}), 400
-            
-        # Read the last n lines from the log file
-        log_lines = []
-        
-        try:
-            with open(log_file_path, 'r') as log_file:
-                log_lines = log_file.readlines()[-num_lines:]
-        except Exception as e:
-            return jsonify({"error": f"Error reading log file: {str(e)}"}), 500
-            
-        return jsonify({
-            "logs": log_lines,
-            "count": len(log_lines),
-            "log_file": log_file_path
-        })
-        
-    except Exception as e:
-        return jsonify({"error": f"Error retrieving logs: {str(e)}"}), 500
-
-@app.route('/screenshots')
-def list_screenshots():
-    """Endpoint to list available screenshots"""
-    try:
-        screenshot_path = os.path.join(os.getcwd(), 'screenshots')
-        
-        if not os.path.exists(screenshot_path):
-            return jsonify({"screenshots": [], "count": 0})
-            
-        screenshots = []
-        for file in os.listdir(screenshot_path):
-            if file.endswith('.png'):
-                file_path = os.path.join(screenshot_path, file)
-                screenshots.append({
-                    "filename": file,
-                    "path": file_path,
-                    "size": os.path.getsize(file_path),
-                    "created": time.ctime(os.path.getctime(file_path))
-                })
-                
-        # Sort by creation time (newest first)
-        screenshots.sort(key=lambda x: x["created"], reverse=True)
-        
-        return jsonify({
-            "screenshots": screenshots,
-            "count": len(screenshots)
-        })
-        
-    except Exception as e:
-        return jsonify({"error": f"Error listing screenshots: {str(e)}"}), 500
-
-
 
 if __name__ == '__main__':
     try:
