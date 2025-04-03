@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPA Validation</title>
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- Local Fonts -->
+    <style>
+        @font-face {
+            font-family: 'Roboto';
+            src: url('{{ url_for('static', filename='fonts/Roboto-Regular.ttf') }}') format('truetype');
+            font-weight: 400;
+        }
+
+        @font-face {
+            font-family: 'Roboto';
+            src: url('{{ url_for('static', filename='fonts/Roboto-Medium.ttf') }}') format('truetype');
+            font-weight: 500;
+        }
+
+        @font-face {
+            font-family: 'Roboto';
+            src: url('{{ url_for('static', filename='fonts/Roboto-Bold.ttf') }}') format('truetype');
+            font-weight: 700;
+        }
+
+        body {
+            background-color: #f4f4f4;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .card {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .form-label {
+            font-weight: bold;
+        }
+
+        .form-select option {
+            font-weight: bold;
+        }
+
+        /* Button styles */
+        .btn-hover {
+            width: 250px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            margin: 20px 25px;
+            height: 65px;
+            text-align: center;
+            border: none;
+            background-size: 300% 100%;
+            border-radius: 50px;
+            transition: all 0.4s ease-in-out;
+        }
+
+        .btn-hover:hover {
+            background-position: 100% 0;
+            transition: all 0.4s ease-in-out;
+        }
+
+        .btn-hover:focus {
+            outline: none;
+        }
+
+        .color-start {
+            background-image: linear-gradient(to right, #067645, #3cba92, #30dd8a, #2bb673);
+            box-shadow: 0 4px 15px 0 rgba(23, 168, 108, 0.75);
+        }
+
+        .color-pause {
+            background-image: linear-gradient(to right, #6253e1, #852D91, #A3A1FF, #F24645);
+            box-shadow: 0 4px 15px 0 rgba(126, 52, 161, 0.75);
+        }
+
+        .color-stop {
+            background-image: linear-gradient(to right, #eb3941, #f15e64, #e14e53, #e2373f);
+            box-shadow: 0 5px 15px rgba(242, 97, 103, .75);
+        }
+
+        /* Submit Button */
+        .submit-btn {
+            background-image: linear-gradient(to right, #ff7e5f, #feb47b);
+            color: #fff;
+            border-radius: 30px;
+            border: none;
+            height: 45px;
+            width: 150px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            background-image: linear-gradient(to right, #feb47b, #ff7e5f);
+        }
+
+        /* Progress bar styles */
+        .progress-bar {
+            background: linear-gradient(45deg, #007bff, #00c6ff);
+            transition: width 1s ease-in-out;
+        }
+
+        /* Loader styles */
+        .dot-loader-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            height: 100px;
+        }
+
+        .dot-loader {
+            display: inline-block;
+            position: relative;
+            width: 80px;
+            height: 6px;
+        }
+
+        .dot-loader div {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #007bff;
+            animation-timing-function: cubic-bezier(0, 1, 1, 0);
+        }
+
+        .dot-loader div:nth-child(1) {
+            left: 8px;
+            animation: dot-loader1 0.6s infinite;
+        }
+
+        .dot-loader div:nth-child(2) {
+            left: 8px;
+            animation: dot-loader2 0.6s infinite;
+        }
+
+        .dot-loader div:nth-child(3) {
+            left: 32px;
+            animation: dot-loader2 0.6s infinite;
+        }
+
+        .dot-loader div:nth-child(4) {
+            left: 56px;
+            animation: dot-loader3 0.6s infinite;
+        }
+
+        @keyframes dot-loader1 {
+            0% {
+                transform: scale(0);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes dot-loader3 {
+            0% {
+                transform: scale(1);
+            }
+
+            100% {
+                transform: scale(0);
+            }
+        }
+
+        @keyframes dot-loader2 {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(24px, 0);
+            }
+        }
+
+        /* List styles */
+        .list-group-item {
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, #f4f4f4, #e0e0e0);
+        }
+
+        .list-group-item .icon {
+            margin-right: 15px;
+        }
+
+        .list-group-item-success {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+        }
+
+        .list-group-item-danger {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+        }
+
+        .list-group-item-success .icon {
+            color: #28a745;
+        }
+
+        .list-group-item-danger .icon {
+            color: #dc3545;
+        }
+
+        .list-group-item-warning {
+            background: linear-gradient(135deg, #fff3cd, #ffeeba);
+            color: #856404;
+        }
+
+        .list-group-item-warning .icon {
+            color: #ffc107;
+        }
+
+        .tooltip-inner {
+            background-color: #007bff !important;
+            color: #fff;
+        }
+
+        .tooltip-arrow {
+            border-bottom-color: #007bff !important;
+        }
+
+        .disabled-list {
+            pointer-events: none;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row mt-5">
+            <!-- Left Column -->
+            <div class="col-md-8">
+                <div class="card p-4 mb-4">
+                    <h1 class="text-center mb-4">FPA Validation</h1>
+                    <form id="validationForm">
+                        <div class="form-group mb-4">
+                            <label for="environment" class="form-label" data-bs-toggle="tooltip" data-bs-placement="right" title="Select the environment for validation">Select Environment:</label>
+                            <select class="form-select" id="environment" name="environment">
+                                <option value="IT">IT</option>
+                                <option value="QV">QV</option>
+                                <option value="Prod">Prod</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-4">
+                            <label for="validationPortalLink" class="form-label">Validation Portal Link (Optional):</label>
+                            <div class="input-group">
+                                <input type="url" class="form-control" id="validationPortalLink" name="validationPortalLink" placeholder="Enter the validation portal link">
+                                <button type="button" class="submit-btn" onclick="submitPortalLink()">Submit</button>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn-hover color-start" data-bs-toggle="tooltip" data-bs-placement="top" title="Start the validation process">Start Validation <i class="fas fa-play ms-2"></i></button>
+                            <button type="button" id="pauseBtn" class="btn-hover color-pause" data-bs-toggle="tooltip" data-bs-placement="top" title="Pause the validation process">Pause Validation <i class="fas fa-pause ms-2"></i></button>
+                            <button type="button" id="stopBtn" class="btn-hover color-stop" data-bs-toggle="tooltip" data-bs-placement="top" title="Stop the validation process">Stop Validation <i class="fas fa-stop ms-2"></i></button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card p-4" id="statusContainer">
+                    <h2 class="text-center">Status: <span id="statusText">Not Started</span></h2>
+                    <div class="progress mt-4">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" role="progressbar" style="width: 0%;"></div>
+                    </div>
+                    <ul id="statusList" class="list-group list-group-flush mt-4"></ul>
+                    <div class="dot-loader-container" id="loaderContainer" style="display: none;">
+                        <div class="dot-loader"><div></div><div></div><div></div><div></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="col-md-4">
+                <div class="card p-4">
+                    <h2 class="text-center">Validation Progress</h2>
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Local jQuery -->
+    <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            $('[data-bs-toggle="tooltip"]').tooltip();
+            let isPaused = false;
+            let chart;
+            let intervalId;
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            
+            // Initialize chart with zero values
+            chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Success', 'Failed', 'Skipped'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: ['#28a745', '#dc3545', '#ffc107'],
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return `${context.label}: ${context.raw}`;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true
+                    }
+                }
+            });
+
+            function updateChart(success, failed, skipped) {
+                chart.data.datasets[0].data = [success, failed, skipped];
+                chart.update();
+            }
+
+            function submitPortalLink() {
+                const validationPortalLink = $('#validationPortalLink').val();
+                if (validationPortalLink) {
+                    alert('Validation portal link submitted successfully!');
+                } else {
+                    alert('Please enter a valid validation portal link.');
+                }
+            }
+
+            function fetchStatus() {
+                $.get('/status', function (data) {
+                    $('#statusText').text(data.status);
+                    $('#statusList').empty();
+                    
+                    // Update progress bar with actual value from backend
+                    $('#progressBar').css('width', data.progress + '%');
+                    
+                    // Update results list
+                    data.results.forEach((result, index) => {
+                        const listItem = $('<li>').addClass('list-group-item d-flex justify-content-between align-items-center');
+                        const icon = $('<i>').addClass('fas fa-check-circle icon');
+                        listItem.text(result);
+                        
+                        // Determine status based on result content
+                        if (result.includes('[Failed]')) {
+                            listItem.addClass('list-group-item-danger');
+                            icon.removeClass('fa-check-circle').addClass('fa-times-circle');
+                        } else if (result.includes('[Skipped]') || result.includes('[Warning]')) {
+                            listItem.addClass('list-group-item-warning');
+                            icon.removeClass('fa-check-circle').addClass('fa-minus-circle');
+                        } else {
+                            listItem.addClass('list-group-item-success');
+                        }
+                        
+                        listItem.prepend(icon);
+                        const statusBadge = $('<span>').addClass('badge bg-secondary rounded-pill');
+                        statusBadge.text(index + 1);
+                        listItem.append(statusBadge);
+                        $('#statusList').append(listItem);
+                    });
+
+                    // Update chart with actual counts from backend
+                    updateChart(data.successful_checks || 0, data.failed_checks || 0, data.skipped_checks || 0);
+
+                    // Handle completion states
+                    if (data.status === 'Completed' || data.status === 'Failed' || data.status === 'Stopped') {
+                        clearInterval(intervalId);
+                        $('#loaderContainer').hide();
+                        $('#progressBar').css('width', '100%');
+                        $('#progressBar').removeClass('progress-bar-animated');
+                    }
+                }).fail(function() {
+                    console.error('Failed to fetch status');
+                });
+            }
+
+            $('#validationForm').submit(function (e) {
+                e.preventDefault();
+                const environment = $('#environment').val();
+                const validationPortalLink = $('#validationPortalLink').val();
+                $('#statusContainer').show();
+                $('#statusText').text('Running');
+                $('#progressBar').css('width', '0%');
+                $('#progressBar').addClass('progress-bar-animated');
+                $('#statusList').empty();
+                $('#loaderContainer').show();
+
+                $.ajax({
+                    url: '/start_validation',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ 
+                        environment, 
+                        validation_portal_link: validationPortalLink 
+                    }),
+                    success: function (response) {
+                        // Start polling for status updates
+                        intervalId = setInterval(fetchStatus, 2000);
+                    },
+                    error: function (error) {
+                        console.error('Error starting validation:', error);
+                        $('#statusText').text('Failed to Start');
+                        $('#loaderContainer').hide();
+                    }
+                });
+            });
+
+            $('#pauseBtn').click(function () {
+                if (isPaused) {
+                    $.post('/pause_resume_validation', function () {
+                        $('#pauseBtn').html('Pause Validation <i class="fas fa-pause ms-2"></i>');
+                        $('#statusText').text('Running');
+                        isPaused = false;
+                    });
+                } else {
+                    $.post('/pause_resume_validation', function () {
+                        $('#pauseBtn').html('Resume Validation <i class="fas fa-play ms-2"></i>');
+                        $('#statusText').text('Paused');
+                        isPaused = true;
+                    });
+                }
+            });
+
+            $('#stopBtn').click(function () {
+                $.post('/stop_validation', function () {
+                    $('#statusText').text('Stopped');
+                    $('#loaderContainer').hide();
+                    clearInterval(intervalId);
+                    $('#progressBar').css('width', '100%');
+                    $('#progressBar').removeClass('progress-bar-animated');
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>
