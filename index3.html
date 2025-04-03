@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPA Validation</title>
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Chart.js -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.css">
+    <!-- DataTables -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+    <!-- Custom CSS -->
+    <style>
+        /* [Previous CSS styles remain the same] */
+        
+        /* New styles for reports */
+        .report-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .screenshot-thumbnail {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        
+        .screenshot-thumbnail:hover {
+            transform: scale(1.05);
+        }
+        
+        .modal-screenshot {
+            max-width: 100%;
+            max-height: 80vh;
+        }
+        
+        .timing-table th {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+        }
+        
+        .tab-content {
+            padding: 20px 0;
+        }
+        
+        .export-btn {
+            margin-left: 10px;
+        }
+        
+        .performance-chart-container {
+            height: 300px;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            border-left: 4px solid #007bff;
+            margin-bottom: 15px;
+        }
+        
+        .metric-card .card-body {
+            padding: 15px;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <!-- [Previous main content remains the same] -->
+        
+        <!-- Report Modal -->
+        <div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="reportModalLabel">Validation Report</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="report-container">
+                            <h2 class="text-center mb-4">Validation Report - <span id="reportEnvironment"></span></h2>
+                            <p class="text-center text-muted" id="reportTimestamp"></p>
+                            
+                            <ul class="nav nav-tabs" id="reportTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab">Summary</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="screenshots-tab" data-bs-toggle="tab" data-bs-target="#screenshots" type="button" role="tab">Screenshots</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance" type="button" role="tab">Performance</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button" role="tab">Detailed Logs</button>
+                                </li>
+                            </ul>
+                            
+                            <div class="tab-content" id="reportTabContent">
+                                <!-- Summary Tab -->
+                                <div class="tab-pane fade show active" id="summary" role="tabpanel">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="card mb-4">
+                                                <div class="card-header bg-primary text-white">
+                                                    Validation Overview
+                                                </div>
+                                                <div class="card-body">
+                                                    <canvas id="summaryChart"></canvas>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card mb-4">
+                                                <div class="card-header bg-primary text-white">
+                                                    Key Metrics
+                                                </div>
+                                                <div class="card-body">
+                                                    <div class="row">
+                                                        <div class="col-md-6 mb-3">
+                                                            <div class="card metric-card">
+                                                                <div class="card-body">
+                                                                    <div class="metric-value" id="totalChecks">0</div>
+                                                                    <div class="metric-label">Total Checks</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <div class="card metric-card">
+                                                                <div class="card-body">
+                                                                    <div class="metric-value text-success" id="successChecks">0</div>
+                                                                    <div class="metric-label">Successful</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <div class="card metric-card">
+                                                                <div class="card-body">
+                                                                    <div class="metric-value text-danger" id="failedChecks">0</div>
+                                                                    <div class="metric-label">Failed</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <div class="card metric-card">
+                                                                <div class="card-body">
+                                                                    <div class="metric-value text-warning" id="skippedChecks">0</div>
+                                                                    <div class="metric-label">Skipped</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="row mt-3">
+                                                        <div class="col-md-6">
+                                                            <div class="card metric-card">
+                                                                <div class="card-body">
+                                                                    <div class="metric-value" id="totalTime">0s</div>
+                                                                    <div class="metric-label">Total Duration</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="card metric-card">
+                                                                <div class="card-body">
+                                                                    <div class="metric-value" id="avgTime">0s</div>
+                                                                    <div class="metric-label">Avg. Check Time</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <div class="card">
+                                                <div class="card-header bg-primary text-white">
+                                                    Validation Timeline
+                                                </div>
+                                                <div class="card-body">
+                                                    <canvas id="timelineChart"></canvas>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Screenshots Tab -->
+                                <div class="tab-pane fade" id="screenshots" role="tabpanel">
+                                    <div class="row" id="screenshotGallery">
+                                        <!-- Screenshots will be populated here -->
+                                    </div>
+                                </div>
+                                
+                                <!-- Performance Tab -->
+                                <div class="tab-pane fade" id="performance" role="tabpanel">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="performance-chart-container">
+                                                <h4>Component Load Times</h4>
+                                                <canvas id="componentTimingChart"></canvas>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="performance-chart-container">
+                                                <h4>Performance Distribution</h4>
+                                                <canvas id="performanceDistributionChart"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <h4 class="mt-4">Detailed Timing Data</h4>
+                                            <div class="table-responsive">
+                                                <table class="table table-striped timing-table" id="timingDataTable">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Component</th>
+                                                            <th>Type</th>
+                                                            <th>Duration (ms)</th>
+                                                            <th>Status</th>
+                                                            <th>Timestamp</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Timing data will be populated here -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Details Tab -->
+                                <div class="tab-pane fade" id="details" role="tabpanel">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped" id="detailedLogsTable">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Timestamp</th>
+                                                    <th>Message</th>
+                                                    <th>Status</th>
+                                                    <th>Duration</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Detailed logs will be populated here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary export-btn" onclick="exportReport('pdf')">
+                            <i class="fas fa-file-pdf"></i> Export as PDF
+                        </button>
+                        <button type="button" class="btn btn-primary export-btn" onclick="exportReport('html')">
+                            <i class="fas fa-file-code"></i> Export as HTML
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Screenshot Modal -->
+        <div class="modal fade" id="screenshotModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Screenshot</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <img src="" class="modal-screenshot" id="modalScreenshot">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" onclick="downloadScreenshot()">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script>
+        // [Previous JavaScript code remains the same until the end of the document.ready function]
+        
+        // Add these new functions after the existing code:
+        
+        // Performance tracking object
+        const performanceMetrics = {
+            timings: [],
+            startTimes: {},
+            componentStats: {},
+            
+            startTimer: function(componentId, componentType) {
+                this.startTimes[componentId] = performance.now();
+                return componentId;
+            },
+            
+            endTimer: function(componentId, status) {
+                if (!this.startTimes[componentId]) return null;
+                
+                const endTime = performance.now();
+                const duration = endTime - this.startTimes[componentId];
+                const timestamp = new Date().toISOString();
+                
+                const timingData = {
+                    id: componentId,
+                    type: componentType || 'element',
+                    duration: duration,
+                    status: status || 'success',
+                    timestamp: timestamp
+                };
+                
+                this.timings.push(timingData);
+                
+                // Update component statistics
+                if (!this.componentStats[componentId]) {
+                    this.componentStats[componentId] = {
+                        count: 0,
+                        total: 0,
+                        min: Infinity,
+                        max: 0,
+                        successes: 0,
+                        failures: 0
+                    };
+                }
+                
+                const stats = this.componentStats[componentId];
+                stats.count++;
+                stats.total += duration;
+                stats.min = Math.min(stats.min, duration);
+                stats.max = Math.max(stats.max, duration);
+                
+                if (status === 'success') {
+                    stats.successes++;
+                } else {
+                    stats.failures++;
+                }
+                
+                return timingData;
+            },
+            
+            getComponentStats: function(componentId) {
+                if (!this.componentStats[componentId]) return null;
+                
+                const stats = this.componentStats[componentId];
+                return {
+                    id: componentId,
+                    count: stats.count,
+                    total: stats.total,
+                    average: stats.total / stats.count,
+                    min: stats.min,
+                    max: stats.max,
+                    successRate: (stats.successes / stats.count) * 100
+                };
+            },
+            
+            getAllStats: function() {
+                return Object.keys(this.componentStats).map(id => this.getComponentStats(id));
+            },
+            
+            getSummary: function() {
+                const total = this.timings.length;
+                const success = this.timings.filter(t => t.status === 'success').length;
+                const failed = this.timings.filter(t => t.status === 'failed').length;
+                const totalTime = this.timings.reduce((sum, t) => sum + t.duration, 0);
+                const avgTime = total > 0 ? totalTime / total : 0;
+                
+                return {
+                    totalChecks: total,
+                    successChecks: success,
+                    failedChecks: failed,
+                    skippedChecks: total - success - failed,
+                    totalTime: totalTime,
+                    avgTime: avgTime
+                };
+            }
+        };
+        
+        // Report generation functions
+        function generateReport() {
+            const reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
+            const summary = performanceMetrics.getSummary();
+            
+            // Set basic report info
+            $('#reportEnvironment').text($('#environment').val());
+            $('#reportTimestamp').text(new Date().toLocaleString());
+            
+            // Update summary metrics
+            $('#totalChecks').text(summary.totalChecks);
+            $('#successChecks').text(summary.successChecks);
+            $('#failedChecks').text(summary.failedChecks);
+            $('#skippedChecks').text(summary.totalChecks - summary.successChecks - summary.failedChecks);
+            $('#totalTime').text((summary.totalTime / 1000).toFixed(2) + 's');
+            $('#avgTime').text((summary.avgTime / 1000).toFixed(2) + 's');
+            
+            // Initialize charts
+            initSummaryChart();
+            initTimelineChart();
+            initComponentTimingChart();
+            initPerformanceDistributionChart();
+            
+            // Load screenshots
+            loadScreenshots();
+            
+            // Initialize data tables
+            initTimingDataTable();
+            initDetailedLogsTable();
+            
+            // Show the modal
+            reportModal.show();
+        }
+        
+        function initSummaryChart() {
+            const summary = performanceMetrics.getSummary();
+            const ctx = document.getElementById('summaryChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Success', 'Failed', 'Skipped'],
+                    datasets: [{
+                        data: [summary.successChecks, summary.failedChecks, summary.skippedChecks],
+                        backgroundColor: ['#28a745', '#dc3545', '#ffc107'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function initTimelineChart() {
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            const timings = performanceMetrics.timings;
+            
+            // Group by time intervals (e.g., every 5 seconds)
+            const timeGroups = {};
+            const interval = 5000; // 5 seconds
+            
+            timings.forEach(timing => {
+                const time = new Date(timing.timestamp).getTime();
+                const group = Math.floor(time / interval) * interval;
+                
+                if (!timeGroups[group]) {
+                    timeGroups[group] = {
+                        time: new Date(group),
+                        success: 0,
+                        failed: 0,
+                        skipped: 0
+                    };
+                }
+                
+                if (timing.status === 'success') {
+                    timeGroups[group].success++;
+                } else if (timing.status === 'failed') {
+                    timeGroups[group].failed++;
+                } else {
+                    timeGroups[group].skipped++;
+                }
+            });
+            
+            const groups = Object.values(timeGroups).sort((a, b) => a.time - b.time);
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: groups.map(g => g.time.toLocaleTimeString()),
+                    datasets: [
+                        {
+                            label: 'Success',
+                            data: groups.map(g => g.success),
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            tension: 0.1,
+                            fill: true
+                        },
+                        {
+                            label: 'Failed',
+                            data: groups.map(g => g.failed),
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            tension: 0.1,
+                            fill: true
+                        },
+                        {
+                            label: 'Skipped',
+                            data: groups.map(g => g.skipped),
+                            borderColor: '#ffc107',
+                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                            tension: 0.1,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Checks'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        function initComponentTimingChart() {
+            const ctx = document.getElementById('componentTimingChart').getContext('2d');
+            const stats = performanceMetrics.getAllStats();
+            
+            // Sort by average time descending
+            stats.sort((a, b) => b.average - a.average);
+            
+            // Take top 10 components
+            const topComponents = stats.slice(0, 10);
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topComponents.map(c => c.id),
+                    datasets: [
+                        {
+                            label: 'Average Time (ms)',
+                            data: topComponents.map(c => c.average),
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Min Time (ms)',
+                            data: topComponents.map(c => c.min),
+                            backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Max Time (ms)',
+                            data: topComponents.map(c => c.max),
+                            backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Time (ms)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(context) {
+                                    const index = context.dataIndex;
+                                    const stat = topComponents[index];
+                                    return [
+                                        `Success Rate: ${stat.successRate.toFixed(1)}%`,
+                                        `Total Checks: ${stat.count}`
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function initPerformanceDistributionChart() {
+            const ctx = document.getElementById('performanceDistributionChart').getContext('2d');
+            const timings = performanceMetrics.timings.map(t => t.duration);
+            
+            // Create bins for histogram
+            const maxTime = Math.max(...timings);
+            const binSize = Math.ceil(maxTime / 20);
+            const bins = Array(Math.ceil(maxTime / binSize)).fill(0);
+            
+            timings.forEach(time => {
+                const binIndex = Math.floor(time / binSize);
+                bins[binIndex]++;
+            });
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: bins.map((_, i) => `${i * binSize}-${(i + 1) * binSize} ms`),
+                    datasets: [{
+                        label: 'Number of Checks',
+                        data: bins,
+                        backgroundColor: 'rgba(153, 102, 255, 0.7)',
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Checks'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Duration Range (ms)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function loadScreenshots() {
+            $.get('/screenshots', function(data) {
+                const gallery = $('#screenshotGallery');
+                gallery.empty();
+                
+                if (data.screenshots.length === 0) {
+                    gallery.html('<div class="col-12 text-center text-muted">No screenshots available</div>');
+                    return;
+                }
+                
+                data.screenshots.forEach(screenshot => {
+                    const col = $(`
+                        <div class="col-md-4 col-sm-6 mb-4">
+                            <div class="card">
+                                <img src="${screenshot.path}" class="card-img-top screenshot-thumbnail" 
+                                     alt="${screenshot.filename}" data-src="${screenshot.path}">
+                                <div class="card-body">
+                                    <h6 class="card-title">${screenshot.filename}</h6>
+                                    <p class="card-text text-muted small">${screenshot.created}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `);
+                    
+                    col.find('img').click(function() {
+                        $('#modalScreenshot').attr('src', $(this).data('src'));
+                        new bootstrap.Modal(document.getElementById('screenshotModal')).show();
+                    });
+                    
+                    gallery.append(col);
+                });
+            });
+        }
+        
+        function initTimingDataTable() {
+            $('#timingDataTable').DataTable({
+                data: performanceMetrics.timings,
+                columns: [
+                    { data: 'id', title: 'Component' },
+                    { data: 'type', title: 'Type' },
+                    { 
+                        data: 'duration', 
+                        title: 'Duration (ms)',
+                        render: function(data) {
+                            return data.toFixed(2);
+                        }
+                    },
+                    { 
+                        data: 'status', 
+                        title: 'Status',
+                        render: function(data) {
+                            const badgeClass = data === 'success' ? 'badge bg-success' : 
+                                             data === 'failed' ? 'badge bg-danger' : 'badge bg-warning';
+                            return `<span class="${badgeClass}">${data}</span>`;
+                        }
+                    },
+                    { data: 'timestamp', title: 'Timestamp' }
+                ],
+                order: [[4, 'desc']],
+                pageLength: 10
+            });
+        }
+        
+        function initDetailedLogsTable() {
+            $('#detailedLogsTable').DataTable({
+                data: validation_status.results.map((result, index) => {
+                    return {
+                        index: index + 1,
+                        message: result,
+                        timestamp: new Date().toISOString(),
+                        status: result.includes('[Failed]') ? 'Failed' : 
+                               result.includes('[Skipped]') ? 'Skipped' : 'Success',
+                        duration: 'N/A'
+                    };
+                }),
+                columns: [
+                    { data: 'index', title: '#' },
+                    { data: 'timestamp', title: 'Timestamp' },
+                    { data: 'message', title: 'Message' },
+                    { 
+                        data: 'status', 
+                        title: 'Status',
+                        render: function(data) {
+                            const badgeClass = data === 'Success' ? 'badge bg-success' : 
+                                             data === 'Failed' ? 'badge bg-danger' : 'badge bg-warning';
+                            return `<span class="${badgeClass}">${data}</span>`;
+                        }
+                    },
+                    { data: 'duration', title: 'Duration' }
+                ],
+                order: [[0, 'asc']],
+                pageLength: 10
+            });
+        }
+        
+        function downloadScreenshot() {
+            const src = $('#modalScreenshot').attr('src');
+            const link = document.createElement('a');
+            link.href = src;
+            link.download = src.split('/').pop();
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function exportReport(format) {
+            if (format === 'pdf') {
+                // Use html2canvas and jsPDF to generate PDF
+                const element = document.getElementById('reportModal');
+                
+                html2canvas(element, {
+                    scale: 2,
+                    logging: true,
+                    useCORS: true
+                }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+                    const imgWidth = 210; // A4 width in mm
+                    const pageHeight = 295; // A4 height in mm
+                    const imgHeight = canvas.height * imgWidth / canvas.width;
+                    let heightLeft = imgHeight;
+                    let position = 0;
+                    
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                    
+                    while (heightLeft >= 0) {
+                        position = heightLeft - imgHeight;
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                        heightLeft -= pageHeight;
+                    }
+                    
+                    pdf.save('validation_report.pdf');
+                });
+            } else if (format === 'html') {
+                // Create a downloadable HTML file
+                const htmlContent = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Validation Report</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 20px; }
+                            .report-section { margin-bottom: 30px; }
+                            .chart-container { width: 100%; height: 400px; margin: 20px 0; }
+                            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                            th { background-color: #f2f2f2; }
+                            .screenshot { max-width: 100%; margin: 10px 0; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Validation Report</h1>
+                        <p>Generated on: ${new Date().toLocaleString()}</p>
+                        
+                        <!-- You would need to implement functions to convert charts to images -->
+                        <!-- For simplicity, we're just including the data tables -->
+                        
+                        <div class="report-section">
+                            <h2>Timing Data</h2>
+                            ${document.getElementById('timingDataTable').outerHTML}
+                        </div>
+                        
+                        <div class="report-section">
+                            <h2>Detailed Logs</h2>
+                            ${document.getElementById('detailedLogsTable').outerHTML}
+                        </div>
+                    </body>
+                    </html>
+                `;
+                
+                const blob = new Blob([htmlContent], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'validation_report.html';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+        }
+        
+        // Modify the validation functions to track performance
+        function validate_application(environment, validation_portal_link, retry_failed) {
+            // Track overall validation time
+            const validationTimer = performanceMetrics.startTimer('full_validation', 'process');
+            
+            // [Existing validation code...]
+            
+            // At the end of validation:
+            performanceMetrics.endTimer('full_validation', all_tabs_opened ? 'success' : 'failed');
+            
+            // Generate report when complete
+            if (data.status === 'Completed' || data.status === 'Failed') {
+                generateReport();
+            }
+            
+            return validation_results, all_tabs_opened;
+        }
+        
+        function check_tab(tab_element, tab_name, content_locator, index) {
+            const timerId = performanceMetrics.startTimer(`tab_${tab_name}`, 'tab');
+            
+            try {
+                // [Existing tab checking code...]
+                
+                performanceMetrics.endTimer(timerId, success ? 'success' : 'failed');
+                return success;
+            } catch (error) {
+                performanceMetrics.endTimer(timerId, 'failed');
+                throw error;
+            }
+        }
+        
+        function check_sub_tab(sub_tab_js, sub_tab_name, content_locator, main_index, sub_index) {
+            const timerId = performanceMetrics.startTimer(`subtab_${sub_tab_name}`, 'subtab');
+            
+            try {
+                // [Existing sub-tab checking code...]
+                
+                performanceMetrics.endTimer(timerId, success ? 'success' : 'failed');
+                return success;
+            } catch (error) {
+                performanceMetrics.endTimer(timerId, 'failed');
+                throw error;
+            }
+        }
+        
+        function validate_first_list_element_and_cancel(column_index, main_index, sub_index, is_export_control) {
+            const timerId = performanceMetrics.startTimer(`element_${main_index}_${sub_index}`, 'element');
+            
+            try {
+                // [Existing element validation code...]
+                
+                performanceMetrics.endTimer(timerId, first_list_element_success ? 'success' : 'failed');
+                return first_list_element_success;
+            } catch (error) {
+                performanceMetrics.endTimer(timerId, 'failed');
+                throw error;
+            }
+        }
+    </script>
+</body>
+
+</html>
