@@ -2000,42 +2000,43 @@ def capture_dashboard_html(selected_date, environment='PROD'):
         
         time.sleep(1)
         
-        # Get the HTML content of the main dashboard
-        dashboard_html = driver.execute_script("""
-            var dashboard = document.getElementById('tab-main-dashboard');
-            if (!dashboard) return '';
-            
-            // Get all computed styles and inline them
-            function inlineStyles(element) {
-                var computedStyle = window.getComputedStyle(element);
-                var styleString = '';
-                for (var i = 0; i < computedStyle.length; i++) {
-                    var prop = computedStyle[i];
-                    styleString += prop + ':' + computedStyle.getPropertyValue(prop) + ';';
+        # Get the HTML content of the main dashboard - simplified approach
+        try:
+            dashboard_html = driver.execute_script("""
+                var dashboard = document.getElementById('tab-main-dashboard');
+                if (!dashboard) {
+                    console.error('Dashboard element not found');
+                    return '';
                 }
-                element.setAttribute('style', styleString);
                 
-                // Recursively inline styles for children
-                for (var j = 0; j < element.children.length; j++) {
-                    inlineStyles(element.children[j]);
-                }
-            }
+                // Simply return the HTML without complex inline styling
+                // Email clients will handle basic styles from the parent
+                return dashboard.outerHTML;
+            """)
             
-            // Clone the dashboard to avoid modifying the original
-            var clone = dashboard.cloneNode(true);
-            inlineStyles(clone);
+            if not dashboard_html or dashboard_html.strip() == '':
+                print("WARNING: Dashboard HTML is empty")
+                return None
+                
+            print(f"Dashboard HTML captured successfully ({len(dashboard_html)} characters)")
+            return dashboard_html
             
-            return clone.outerHTML;
-        """)
-        
-        print(f"Dashboard HTML captured successfully")
-        return dashboard_html
+        except Exception as script_error:
+            print(f"Error executing JavaScript to capture HTML: {str(script_error)}")
+            import traceback
+            print(traceback.format_exc())
+            return None
         
     except Exception as e:
         print(f"Error capturing dashboard HTML: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         return None
     finally:
-        driver.quit()
+        try:
+            driver.quit()
+        except Exception:
+            pass
 
 
 def send_email_with_screenshot(image_path, processing_date, environment, benchmark_end_time_formatted, failed_jobs=None, solution_text=None):
