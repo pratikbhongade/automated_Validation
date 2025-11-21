@@ -634,10 +634,10 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                                                tab_name=None, sub_tab_name=None):
         """
         Record Workflow Check for a sub-tab:
-        - (Special) If tab=Check Mgmt & subtab=Search:
-              use column 3 and capture its text.
-        - (Special) If tab=Checks & subtab=New Check:
-              use column 1 and pre-fill Sc_PAYEE_NM with captured text.
+        - For Check Mgmt. > Search:
+              use configured column (3 from config) and capture its text.
+        - For Checks > New Check:
+              force column 1 and pre-fill Sc_PAYEE_NM with captured text.
         - Generic:
               optionally click Search (if present),
               click first row element in given column,
@@ -652,10 +652,6 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
 
             # ---------- special column overrides ----------
             effective_column_index = column_index
-
-            # Check Mgmt -> Search = always column 3
-            if tab_name == "Check Mgmt" and sub_tab_name == "Search":
-                effective_column_index = 3
 
             # Checks -> New Check = always column 1
             if tab_name == "Checks" and sub_tab_name == "New Check":
@@ -751,8 +747,8 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     record_interaction("Record Workflow Check (no element)", list_start)
                     return True
 
-                # If we are in Check Mgmt > Search, capture the text we click
-                if tab_name == "Check Mgmt" and sub_tab_name == "Search":
+                # If we are in Check Mgmt. > Search, capture the text we click
+                if tab_name in ("Check Mgmt", "Check Mgmt.") and sub_tab_name == "Search":
                     try:
                         clicked_text = (first_element.text or "").strip()
                     except Exception:
