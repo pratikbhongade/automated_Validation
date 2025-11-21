@@ -39,7 +39,7 @@ logging.basicConfig(
 # Console logging too
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
-console_formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(message)s', '%Y-%m-%d %H:%M:%S')
+console_formatter = logging.Formatter('%Y-%m-%d %H:%M:%S:%(levelname)s:%(message)s')
 console_handler.setFormatter(console_formatter)
 logging.getLogger().addHandler(console_handler)
 
@@ -634,6 +634,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                                                tab_name=None, sub_tab_name=None):
         """
         Record Workflow Check for a sub-tab:
+
         - Check Mgmt. > Search:
               use column 3 and capture its text.
         - Checks > New Check:
@@ -680,6 +681,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                         "Success"
                     )
                 except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
+                    # If we can't find the input, continue anyway
                     pass
                 except Exception:
                     pass
@@ -699,6 +701,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                         log_and_update_status("Search button clicked successfully", "Success")
                         time.sleep(1.5)
             except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
+                # No search button present is fine
                 pass
             except Exception:
                 pass
@@ -906,6 +909,12 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
     all_tabs_opened = True
 
     def handle_sub_tabs(tab_name, sub_tabs, main_index):
+        """
+        Iterate sub-tabs for a main tab.
+        SPECIAL CASE:
+          - Always run Record Workflow for Checks -> New Check,
+            even if config column_index is null/None.
+        """
         nonlocal all_tabs_opened
         sub_tab_results = []
 
@@ -927,11 +936,29 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 # Optional Add on this sub-tab
                 handle_subtab_add_button(main_index, sub_index, tab_name, sub_tab_name)
 
-                column_index = config['tabs'][tab_name]['column_index']
-                if isinstance(column_index, dict):
-                    column_index = column_index.get(sub_tab_name)
+                # Resolve configured column index (may be dict or scalar or null)
+                tab_conf = config['tabs'][tab_name]
+                column_index_conf = tab_conf.get('column_index')
+                if isinstance(column_index_conf, dict):
+                    column_index = column_index_conf.get(sub_tab_name)
+                else:
+                    column_index = column_index_conf
 
-                if column_index is not None:
+                # --- SPECIAL CASE: Checks -> New Check must always run ---
+                if tab_name == "Checks" and sub_tab_name == "New Check":
+                    # Pass 1 as fallback if config is None; inside we override to col 1 anyway
+                    first_list_element_success = validate_first_list_element_and_cancel(
+                        column_index or 1,
+                        main_index,
+                        sub_index,
+                        tab_name,
+                        sub_tab_name
+                    )
+                    if not first_list_element_success:
+                        all_tabs_opened = False
+
+                # Generic tabs with a valid column index
+                elif column_index is not None:
                     first_list_element_success = validate_first_list_element_and_cancel(
                         column_index,
                         main_index,
@@ -939,9 +966,10 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                         tab_name,
                         sub_tab_name
                     )
-
                     if not first_list_element_success:
                         all_tabs_opened = False
+
+                # No column index and not a special case → skip workflow
                 else:
                     result = f"{main_index}.{chr(96 + sub_index)}. No column index specified for '{sub_tab_name}' - skipping Record Workflow Check."
                     log_and_update_status(result, "Skipped")
