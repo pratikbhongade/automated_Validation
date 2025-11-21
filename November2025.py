@@ -125,11 +125,6 @@ def calculate_duration(start, end):
 def setup_driver():
     """
     Set up and configure Edge WebDriver using Selenium Manager.
-
-    Selenium Manager:
-    - Detects installed Edge version
-    - Downloads / locates compatible msedgedriver
-    - Caches for reuse
     """
     options = Options()
     options.add_argument("--start-maximized")
@@ -137,6 +132,10 @@ def setup_driver():
     options.add_argument("--disable-popup-blocking")
     options.add_argument("--disable-infobars")
     options.page_load_strategy = 'normal'
+
+    # Reduce Chromium / Edge console noise
+    options.add_argument("--log-level=3")  # 0=ALL, 1=INFO, 2=WARNING, 3=ERROR
+    options.add_experimental_option("excludeSwitches", ["enable-logging"])
 
     try:
         driver = webdriver.Edge(options=options)
@@ -164,7 +163,7 @@ def find_element_with_retry(driver, by, value, max_attempts=3, wait_time=5,
                             condition=EC.presence_of_element_located):
     """
     Find an element with retry logic to handle stale element references.
-    This is for *required* elements (tabs, table, etc.), not optional buttons.
+    Intended for required elements (tabs, tables), not optional buttons.
     """
     attempt = 0
     last_exception = None
@@ -196,7 +195,7 @@ def find_element_with_retry(driver, by, value, max_attempts=3, wait_time=5,
 
 def click_element_with_retry(element, max_attempts=3):
     """
-    Click an element with retry logic to handle stale element references
+    Click an element with retry logic to handle stale element references.
     """
     attempt = 0
     while attempt < max_attempts:
@@ -241,6 +240,9 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
     Main validation function to test the application in the specified environment.
     """
     global validation_status
+
+    # Shared state: value selected in Check Mgmt > Search (row 2, col 3)
+    check_mgmt_search_value = {"text": None}
 
     # Performance metrics
     validation_status['performance_metrics'] = {
@@ -480,33 +482,24 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
 
     def handle_add_button(main_index, tab_name):
         """
-        Optionally click the Add button on a main tab (if present),
-        then try to Cancel / go back.
-
-        Logs (success only):
-        - "Add button clicked successfully on Main Tab 'X'"
-        - "Cancel button clicked successfully" (if Cancel works)
+        Optional Add button on a main tab (if present).
         """
         pause_event.wait()
         if stop_event.is_set():
             return
 
         try:
-            # Try to locate a clickable Add button (any variant with 'btn_add' in src)
             add_button = WebDriverWait(driver, 3).until(
                 EC.element_to_be_clickable(
                     (By.XPATH, "//img[contains(@src,'btn_add')]")
                 )
             )
         except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
-            # No Add button on this tab → silently ignore
             return
         except Exception:
-            # Any other minor issue → ignore, don't spam logs
             return
 
         try:
-            # Highlight ADD
             highlight(add_button)
             time.sleep(0.5)
 
@@ -524,7 +517,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 except Exception:
                     pass
 
-                # Try Cancel on Add screen (if present)
+                # Try Cancel on Add screen
                 try:
                     cancel_button = WebDriverWait(driver, 3).until(
                         EC.element_to_be_clickable(
@@ -543,14 +536,12 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                             except Exception:
                                 pass
                 except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
-                    # No Cancel on Add screen → best-effort back, no logs
                     try:
                         driver.back()
                         time.sleep(2)
                     except Exception:
                         pass
                 except Exception:
-                    # Unexpected Cancel issue → best-effort back
                     try:
                         driver.back()
                         time.sleep(2)
@@ -558,24 +549,99 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                         pass
 
         except Exception:
-            # Any unexpected Add flow issue → ignore (no warnings)
             try:
                 driver.back()
                 time.sleep(2)
             except Exception:
                 pass
 
-    def validate_first_list_element_and_cancel(column_index, main_index, sub_index):
+    def handle_subtab_add_button(main_index, sub_index, tab_name, sub_tab_name):
+        """
+        Optional Add button on a sub tab (if present).
+        """
+        pause_event.wait()
+        if stop_event.is_set():
+            return
+
+        try:
+            add_button = WebDriverWait(driver, 3).until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//img[contains(@src,'btn_add')]")
+                )
+            )
+        except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
+            return
+        except Exception:
+            return
+
+        try:
+            highlight(add_button)
+            time.sleep(0.5)
+
+            if click_element_with_retry(add_button):
+                log_and_update_status(
+                    f"Add button clicked successfully on Sub Tab '{sub_tab_name}' of Main Tab '{tab_name}'",
+                    "Success"
+                )
+
+                # Wait for Add screen to load
+                try:
+                    WebDriverWait(driver, 5).until(
+                        EC.visibility_of_element_located((By.CSS_SELECTOR, "div#content"))
+                    )
+                except Exception:
+                    pass
+
+                # Try Cancel on Add screen
+                try:
+                    cancel_button = WebDriverWait(driver, 3).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//img[contains(@src,'btn_cancel')]")
+                        )
+                    )
+                    if cancel_button:
+                        highlight(cancel_button)
+                        time.sleep(0.5)
+                        if click_element_with_retry(cancel_button):
+                            log_and_update_status("Cancel button clicked successfully", "Success")
+                        else:
+                            try:
+                                driver.back()
+                                time.sleep(2)
+                            except Exception:
+                                pass
+                except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
+                    try:
+                        driver.back()
+                        time.sleep(2)
+                    except Exception:
+                        pass
+                except Exception:
+                    try:
+                        driver.back()
+                        time.sleep(2)
+                    except Exception:
+                        pass
+
+        except Exception:
+            try:
+                driver.back()
+                time.sleep(2)
+            except Exception:
+                pass
+
+    def validate_first_list_element_and_cancel(column_index, main_index, sub_index,
+                                               tab_name=None, sub_tab_name=None):
         """
         Record Workflow Check for a sub-tab:
-        - Optionally click Search (if present)
-        - Click first row element in given column
-        - Optionally click Cancel (if present) to return
-
-        Logs (success cases only):
-        - "Search button clicked successfully"
-        - "Clicked first list element in column X"
-        - "Cancel button clicked successfully"
+        - (Special) If tab=Check Mgmt & subtab=Search:
+              use column 3 and capture its text.
+        - (Special) If tab=Checks & subtab=New Check:
+              use column 1 and pre-fill Sc_PAYEE_NM with captured text.
+        - Generic:
+              optionally click Search (if present),
+              click first row element in given column,
+              optionally click Cancel (if present) to return.
         """
         pause_event.wait()
         if stop_event.is_set():
@@ -584,12 +650,41 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         try:
             list_start = time.time()
 
-            # Ensure table is visible first
-            WebDriverWait(driver, 5).until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
-            )
+            # ---------- special column overrides ----------
+            effective_column_index = column_index
 
-            # 1) Optional Search
+            # Check Mgmt -> Search = always column 3
+            if tab_name == "Check Mgmt" and sub_tab_name == "Search":
+                effective_column_index = 3
+
+            # Checks -> New Check = always column 1
+            if tab_name == "Checks" and sub_tab_name == "New Check":
+                effective_column_index = 1
+            # ---------------------------------------------------------------------
+
+            is_checks_new = (tab_name == "Checks" and sub_tab_name == "New Check")
+
+            # 0) For Checks > New Check: prefill search input (if we have a captured value)
+            if is_checks_new and check_mgmt_search_value.get("text"):
+                try:
+                    payee_text = check_mgmt_search_value["text"]
+                    input_elem = WebDriverWait(driver, 3).until(
+                        EC.visibility_of_element_located((By.NAME, "Sc_PAYEE_NM"))
+                    )
+                    highlight(input_elem)
+                    time.sleep(0.5)
+                    input_elem.clear()
+                    input_elem.send_keys(payee_text)
+                    log_and_update_status(
+                        f"Entered '{payee_text}' in New Check search input",
+                        "Success"
+                    )
+                except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
+                    pass
+                except Exception:
+                    pass
+
+            # 1) Optional Search button (for all sub-tabs)
             try:
                 search_button = WebDriverWait(driver, 3).until(
                     EC.element_to_be_clickable(
@@ -603,17 +698,17 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     if click_element_with_retry(search_button):
                         log_and_update_status("Search button clicked successfully", "Success")
                         time.sleep(1.5)
-                        WebDriverWait(driver, 5).until(
-                            EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
-                        )
             except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
-                # Search not present → silently ignore
                 pass
             except Exception:
-                # Any other search-related issue → silently ignore
                 pass
 
-            # 2) Table rows
+            # 2) Ensure table is visible AFTER optional search
+            WebDriverWait(driver, 5).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
+            )
+
+            # 3) Handle rows
             max_attempts = 3
             attempt = 0
             rows = []
@@ -635,26 +730,39 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 return True
 
             try:
-                # 3) First clickable element in the given column
+                # 4) First clickable element in the chosen column
                 try:
                     first_element = find_element_with_retry(
                         driver,
                         By.XPATH,
-                        f"//table[@class='ListView']/tbody/tr[2]/td[{column_index}]/a",
+                        f"//table[@class='ListView']/tbody/tr[2]/td[{effective_column_index}]/a",
                         max_attempts=2,
                         wait_time=3
                     )
                 except (TimeoutException, NoSuchElementException):
-                    result = f"No clickable element found in column {column_index} of the first row - skipping."
+                    result = f"No clickable element found in column {effective_column_index} of the first row - skipping."
                     log_and_update_status(result, "Skipped")
                     record_interaction("Record Workflow Check (no element)", list_start)
                     return True
 
                 if not first_element:
-                    result = f"First row clickable element is None for column {column_index} - skipping."
+                    result = f"First row clickable element is None for column {effective_column_index} - skipping."
                     log_and_update_status(result, "Skipped")
                     record_interaction("Record Workflow Check (no element)", list_start)
                     return True
+
+                # If we are in Check Mgmt > Search, capture the text we click
+                if tab_name == "Check Mgmt" and sub_tab_name == "Search":
+                    try:
+                        clicked_text = (first_element.text or "").strip()
+                    except Exception:
+                        clicked_text = ""
+                    check_mgmt_search_value["text"] = clicked_text
+                    if clicked_text:
+                        log_and_update_status(
+                            f"Captured value '{clicked_text}' from Check Mgmt > Search (column {effective_column_index})",
+                            "Success"
+                        )
 
                 highlight(first_element)
                 time.sleep(0.5)
@@ -663,7 +771,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
 
                 if not click_element_with_retry(first_element):
                     result = (
-                        f"Failed to click first row element in column {column_index}. "
+                        f"Failed to click first row element in column {effective_column_index}. "
                         "Element became stale. Skipping."
                     )
                     log_and_update_status(result, "Skipped")
@@ -674,7 +782,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 record_element_timing("Record Workflow element click", element_duration)
 
                 log_and_update_status(
-                    f"Clicked first list element in column {column_index}",
+                    f"Clicked first list element in column {effective_column_index}",
                     "Success"
                 )
 
@@ -683,7 +791,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 )
                 time.sleep(1)
 
-                # 4) Optional Cancel
+                # 5) Optional Cancel button
                 try:
                     cancel_button = WebDriverWait(driver, 3).until(
                         EC.element_to_be_clickable(
@@ -709,14 +817,12 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                         except Exception:
                             pass
                 except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
-                    # Cancel not present → best-effort back
                     try:
                         driver.back()
                         time.sleep(2)
                     except Exception:
                         pass
                 except Exception:
-                    # Unexpected Cancel issue → best-effort back
                     try:
                         driver.back()
                         time.sleep(2)
@@ -818,6 +924,9 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             )
 
             if sub_success:
+                # Optional Add on this sub-tab
+                handle_subtab_add_button(main_index, sub_index, tab_name, sub_tab_name)
+
                 column_index = config['tabs'][tab_name]['column_index']
                 if isinstance(column_index, dict):
                     column_index = column_index.get(sub_tab_name)
@@ -826,7 +935,9 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     first_list_element_success = validate_first_list_element_and_cancel(
                         column_index,
                         main_index,
-                        sub_index
+                        sub_index,
+                        tab_name,
+                        sub_tab_name
                     )
 
                     if not first_list_element_success:
@@ -879,7 +990,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     result = f"{i}. Main Tab '{tab_name}' opened successfully."
                     log_and_update_status(result, "Success")
 
-                    # Optional Add button on main tab
+                    # Optional Add on main tab
                     handle_add_button(i, tab_name)
 
                     if 'sub_tabs' in tab_data:
