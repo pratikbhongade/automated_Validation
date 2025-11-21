@@ -11,7 +11,7 @@ import socket
 from functools import wraps
 from selenium import webdriver
 from selenium.webdriver.edge.options import Options
-from selenium.webdriver.edge.service import Service
+from selenium.webdriver.edge.service import Service  # kept, but not required with Selenium Manager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -22,7 +22,6 @@ from selenium.common.exceptions import (
     StaleElementReferenceException,
     WebDriverException,
 )
-from webdriver_manager.microsoft import EdgeChromiumDriverManager  # <-- NEW
 from email_sender import send_email
 import pyautogui
 import webbrowser
@@ -131,7 +130,17 @@ def calculate_duration(start, end):
 
 
 def setup_driver():
-    """Set up and configure the WebDriver with automatic Edge WebDriver management."""
+    """
+    Set up and configure Edge WebDriver using Selenium Manager.
+
+    Selenium Manager will:
+    - Detect installed Edge version
+    - Download / locate a compatible msedgedriver
+    - Cache and reuse it for subsequent runs
+
+    NOTE: Needs internet access at least once per Edge version,
+    unless the driver is already cached/available in PATH.
+    """
     options = Options()
     options.add_argument("--start-maximized")          # Start maximized
     options.add_argument("--disable-extensions")       # Disable extensions
@@ -140,16 +149,21 @@ def setup_driver():
     options.page_load_strategy = 'normal'              # Wait for full page load
 
     try:
-        # Automatically download & manage compatible Edge WebDriver
-        driver_path = EdgeChromiumDriverManager().install()
-        service = Service(driver_path)
-        driver = webdriver.Edge(service=service, options=options)
-        logging.info(f"Using Edge WebDriver from: {driver_path}")
+        # Selenium Manager handles driver resolution automatically
+        driver = webdriver.Edge(options=options)
+        logging.info("Using Edge WebDriver via Selenium Manager (auto-managed)")
+    except WebDriverException as e:
+        logging.error(f"Failed to initialize Edge WebDriver via Selenium Manager: {e}")
+        logging.error(
+            "Possible causes:\n"
+            "1. No internet access to download msedgedriver the first time for this Edge version, OR\n"
+            "2. Corporate proxy/firewall blocking Selenium from reaching Microsoft driver servers.\n\n"
+            "Fix: Ensure network/proxy allows Selenium to download Edge WebDriver, "
+            "or pre-install msedgedriver on PATH."
+        )
+        raise
     except Exception as e:
-        logging.error(f"Failed to initialize Edge WebDriver using webdriver_manager: {e}")
-        logging.error("Please ensure:")
-        logging.error("1. You have internet connectivity for first-time driver download.")
-        logging.error("2. The 'webdriver-manager' package is installed.")
+        logging.error(f"Unexpected error while initializing Edge WebDriver: {e}")
         raise
 
     driver.set_page_load_timeout(30)
