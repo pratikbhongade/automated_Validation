@@ -1838,16 +1838,13 @@ def capture_main_dashboard(selected_date, environment='PROD', output_path=None):
     edge_options.add_argument("--disable-dev-shm-usage")
     edge_options.add_argument("--window-size=1920,1080")  # Standard HD viewport
     
-    # Path to Edge driver - Updated for PyInstaller
-    edge_driver_path = get_edge_driver_path()
-    
-    # Initialize the driver
+    # Initialize the driver using Selenium Manager (automatic driver management)
+    # No need to specify executable_path - Selenium Manager handles it automatically
     try:
-        webdriver_service = EdgeService(executable_path=edge_driver_path)
-        driver = webdriver.Edge(service=webdriver_service, options=edge_options)
+        driver = webdriver.Edge(options=edge_options)
+        print("Edge WebDriver initialized successfully using Selenium Manager")
     except Exception as e:
         print(f"Error initializing Edge WebDriver: {str(e)}")
-        print(f"Trying Edge driver path: {edge_driver_path}")
         raise
     
     try:
@@ -1934,13 +1931,11 @@ def capture_dashboard_html(selected_date, environment='PROD'):
     edge_options.add_argument("--disable-dev-shm-usage")
     edge_options.add_argument("--window-size=1920,1080")
     
-    # Path to Edge driver
-    edge_driver_path = get_edge_driver_path()
-    
-    # Initialize the driver
+    # Initialize the driver using Selenium Manager (automatic driver management)
+    # No need to specify executable_path - Selenium Manager handles it automatically
     try:
-        webdriver_service = EdgeService(executable_path=edge_driver_path)
-        driver = webdriver.Edge(service=webdriver_service, options=edge_options)
+        driver = webdriver.Edge(options=edge_options)
+        print("Edge WebDriver initialized successfully using Selenium Manager")
     except Exception as e:
         print(f"Error initializing Edge WebDriver: {str(e)}")
         return None
