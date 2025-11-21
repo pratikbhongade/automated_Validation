@@ -634,9 +634,9 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                                                tab_name=None, sub_tab_name=None):
         """
         Record Workflow Check for a sub-tab:
-        - For Check Mgmt. > Search:
-              use configured column (3 from config) and capture its text.
-        - For Checks > New Check:
+        - Check Mgmt. > Search:
+              use column 3 and capture its text.
+        - Checks > New Check:
               force column 1 and pre-fill Sc_PAYEE_NM with captured text.
         - Generic:
               optionally click Search (if present),
@@ -652,6 +652,10 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
 
             # ---------- special column overrides ----------
             effective_column_index = column_index
+
+            # Check Mgmt / Check Mgmt. -> Search = always column 3
+            if tab_name in ("Check Mgmt", "Check Mgmt.") and sub_tab_name == "Search":
+                effective_column_index = 3
 
             # Checks -> New Check = always column 1
             if tab_name == "Checks" and sub_tab_name == "New Check":
