@@ -11,7 +11,6 @@ import socket
 from functools import wraps
 from selenium import webdriver
 from selenium.webdriver.edge.options import Options
-from selenium.webdriver.edge.service import Service  # kept, but not required with Selenium Manager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -273,12 +272,9 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
     validation_status['progress'] = 0  # Initialize progress at 0%
     validation_status['screenshots'] = []
 
-    # Track previous failed checks for retry
+    # Track previous failed checks for retry (currently not used, but kept for future)
     previous_results = validation_status['results'] if retry_failed else []
     validation_status['results'] = []
-
-    # Track failed tabs for retry
-    failed_tabs = []
 
     # Set the URL based on environment
     try:
@@ -299,7 +295,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
     logging.info(f"Selected environment: {environment}")
     validation_status['results'].append(f"Selected environment: {environment}")
 
-    # Setup WebDriver with improved options
+    # Setup WebDriver
     try:
         driver = setup_driver()
         logging.info("WebDriver initialized successfully")
@@ -507,7 +503,13 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             record_interaction(f"Sub-tab {sub_tab_name} load", sub_tab_start)
             return False
 
-    def validate_first_list_element_and_cancel(column_index, main_index, sub_index, is_export_control=False):
+    def validate_first_list_element_and_cancel(column_index, main_index, sub_index):
+        """
+        For the current sub-tab:
+        - Optionally click Search (if button exists)
+        - Validate the first row's clickable element
+        - Click Cancel (any cancel button variant) to return
+        """
         pause_event.wait()
         if stop_event.is_set():
             return False
@@ -515,10 +517,46 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         try:
             list_start = time.time()
 
+            # Ensure table is visible first
             WebDriverWait(driver, 5).until(
                 EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
             )
 
+            # 🔍 1) Try clicking Search button if present (any style)
+            try:
+                search_button = find_element_with_retry(
+                    driver,
+                    By.XPATH,
+                    "//img[contains(@src,'btn_search')]",
+                    max_attempts=2,
+                    wait_time=3
+                )
+                if search_button:
+                    highlight(search_button)
+                    time.sleep(0.5)
+                    if click_element_with_retry(search_button):
+                        log_and_update_status(
+                            f"{main_index}.{chr(96 + sub_index)}. Search button clicked successfully.",
+                            "Success"
+                        )
+                        # Wait for results to refresh
+                        time.sleep(1.5)
+                        WebDriverWait(driver, 5).until(
+                            EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
+                        )
+            except (TimeoutException, NoSuchElementException):
+                # No Search button is totally fine – not all screens need it
+                log_and_update_status(
+                    f"{main_index}.{chr(96 + sub_index)}. No Search button found - skipping Search click.",
+                    "Skipped"
+                )
+            except Exception as e:
+                log_and_update_status(
+                    f"{main_index}.{chr(96 + sub_index)}. Error while clicking Search button: {str(e)}. Skipping Search.",
+                    "Warning"
+                )
+
+            # 🔎 2) Now handle the table rows
             max_attempts = 3
             attempt = 0
             rows = []
@@ -540,6 +578,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 return True
 
             try:
+                # 3) Find the first clickable element in the given column
                 first_element = None
                 try:
                     first_element = find_element_with_retry(
@@ -575,17 +614,12 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     )
                     time.sleep(1)
 
-                    cancel_xpath = (
-                        "//img[@src='/fpa/images/btn_cancel.jpg']"
-                        if is_export_control
-                        else "//img[@src='/fpa/images/btn_cancel.gif']"
-                    )
-
+                    # 4) Find Cancel button dynamically (supports .gif and .jpg)
                     try:
                         cancel_button = find_element_with_retry(
                             driver,
                             By.XPATH,
-                            cancel_xpath,
+                            "//img[contains(@src,'btn_cancel')]",
                             max_attempts=2
                         )
 
@@ -647,6 +681,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
 
     driver.set_page_load_timeout(30)
 
+    # ---------- Navigation to base URL ----------
     try:
         navigation_attempts = 0
         max_navigation_attempts = 3
@@ -690,6 +725,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         validation_status['end_time'] = time.strftime("%Y-%m-%d %H:%M:%S")
         return validation_results, False
 
+    # ---------- Tab / Sub-tab handling ----------
     all_tabs_opened = True
 
     def handle_sub_tabs(tab_name, sub_tabs, main_index):
@@ -709,7 +745,6 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 main_index,
                 sub_index
             )
-            is_export_control = tab_name == "Positive Pay" and sub_tab_name == "Export Control"
 
             if sub_success:
                 column_index = config['tabs'][tab_name]['column_index']
@@ -720,8 +755,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     first_list_element_success = validate_first_list_element_and_cancel(
                         column_index,
                         main_index,
-                        sub_index,
-                        is_export_control=is_export_control
+                        sub_index
                     )
 
                     if not first_list_element_success:
@@ -741,7 +775,6 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
 
         return sub_tab_results
 
-    all_tabs_opened = True
     total_tabs = len(config['tabs'])
     tabs_processed = 0
 
