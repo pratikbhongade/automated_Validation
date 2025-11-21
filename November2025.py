@@ -36,7 +36,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Create a console handler for logging to console too
+# Console logging too
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
 console_formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(message)s', '%Y-%m-%d %H:%M:%S')
@@ -53,7 +53,7 @@ except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
     logging.error(f"Failed to load configuration: {e}")
     raise
 
-# Create Flask app
+# Flask app
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
 
@@ -80,37 +80,31 @@ pause_event.set()
 stop_event = threading.Event()
 stop_event.clear()
 
-# Global active thread tracker
+# Active thread tracker
 active_validation_thread = None
 
-# Rate limiter for API - simple implementation
+# Simple rate limiter
 request_timestamps = {}
-REQUEST_RATE_LIMIT = 10  # Max requests per minute
-REQUEST_WINDOW = 60  # seconds
+REQUEST_RATE_LIMIT = 10  # per minute
+REQUEST_WINDOW = 60      # seconds
 
 
-# Function decorator for rate limiting
 def rate_limit(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         client_ip = request.remote_addr
         current_time = time.time()
 
-        # Clean up old timestamps
+        # purge old timestamps
         request_timestamps[client_ip] = [
             t for t in request_timestamps.get(client_ip, [])
             if current_time - t < REQUEST_WINDOW
         ]
 
-        # Check rate limit
         if len(request_timestamps.get(client_ip, [])) >= REQUEST_RATE_LIMIT:
             abort(429, "Too many requests")
 
-        # Add current timestamp
-        if client_ip not in request_timestamps:
-            request_timestamps[client_ip] = []
-        request_timestamps[client_ip].append(current_time)
-
+        request_timestamps.setdefault(client_ip, []).append(current_time)
         return func(*args, **kwargs)
 
     return wrapper
@@ -124,7 +118,7 @@ def calculate_duration(start, end):
         end_dt = datetime.strptime(end, '%Y-%m-%d %H:%M:%S')
         duration = end_dt - start_dt
         return str(duration)
-    except:
+    except Exception:
         return 'N/A'
 
 
@@ -132,13 +126,10 @@ def setup_driver():
     """
     Set up and configure Edge WebDriver using Selenium Manager.
 
-    Selenium Manager will:
-    - Detect installed Edge version
-    - Download / locate a compatible msedgedriver
-    - Cache and reuse it for subsequent runs
-
-    NOTE: Needs internet access at least once per Edge version,
-    unless the driver is already cached/available in PATH.
+    Selenium Manager:
+    - Detects installed Edge version
+    - Downloads / locates compatible msedgedriver
+    - Caches for reuse
     """
     options = Options()
     options.add_argument("--start-maximized")
@@ -154,7 +145,7 @@ def setup_driver():
         logging.error(f"Failed to initialize Edge WebDriver via Selenium Manager: {e}")
         logging.error(
             "Possible causes:\n"
-            "1. No internet access to download msedgedriver the first time for this Edge version, OR\n"
+            "1. No internet access the first time for this Edge version, OR\n"
             "2. Corporate proxy/firewall blocking Selenium from reaching Microsoft driver servers.\n\n"
             "Fix: Ensure network/proxy allows Selenium to download Edge WebDriver, "
             "or pre-install msedgedriver on PATH."
@@ -172,7 +163,8 @@ def setup_driver():
 def find_element_with_retry(driver, by, value, max_attempts=3, wait_time=5,
                             condition=EC.presence_of_element_located):
     """
-    Find an element with retry logic to handle stale element references
+    Find an element with retry logic to handle stale element references.
+    This is for *required* elements (tabs, table, etc.), not optional buttons.
     """
     attempt = 0
     last_exception = None
@@ -194,7 +186,7 @@ def find_element_with_retry(driver, by, value, max_attempts=3, wait_time=5,
                     try:
                         driver.refresh()
                         time.sleep(2)
-                    except:
+                    except Exception:
                         pass
                 raise last_exception
             time.sleep(1)
@@ -214,15 +206,15 @@ def click_element_with_retry(element, max_attempts=3):
                 driver = element._parent
                 driver.execute_script("arguments[0].scrollIntoView(true);", element)
                 time.sleep(0.5)
-            except:
+            except Exception:
                 pass
 
-            # JS click first
+            # Try JS click, then normal click
             try:
                 driver = element._parent
                 driver.execute_script("arguments[0].click();", element)
                 return True
-            except:
+            except Exception:
                 element.click()
                 return True
 
@@ -246,18 +238,18 @@ def click_element_with_retry(element, max_attempts=3):
 
 def validate_application(environment, validation_portal_link=None, retry_failed=False):
     """
-    Main validation function to test the application in the specified environment
+    Main validation function to test the application in the specified environment.
     """
     global validation_status
 
-    # Initialize performance metrics
+    # Performance metrics
     validation_status['performance_metrics'] = {
         'component_timings': {},
         'interaction_timings': [],
         'element_timings': {}
     }
 
-    # Update validation status
+    # Status init
     validation_status['status'] = 'Running'
     validation_status['environment'] = environment
     validation_status['start_time'] = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -268,11 +260,10 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
     validation_status['progress'] = 0
     validation_status['screenshots'] = []
 
-    # Reset / track previous results if needed
     previous_results = validation_status['results'] if retry_failed else []
     validation_status['results'] = []
 
-    # Set the URL based on environment
+    # Environment URL
     try:
         url = config['environments'].get(environment)
         if not url:
@@ -291,7 +282,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
     logging.info(f"Selected environment: {environment}")
     validation_status['results'].append(f"Selected environment: {environment}")
 
-    # Setup WebDriver
+    # WebDriver
     try:
         driver = setup_driver()
         logging.info("WebDriver initialized successfully")
@@ -307,8 +298,8 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
 
     def log_and_update_status(message, status="Success"):
         """
-        Log a message and update the validation status
-        status allowed: "Success", "Failed", "Skipped", "Info"
+        Log a message and update the validation status.
+        status: "Success", "Failed", "Skipped", "Info"
         """
         if status == "Success":
             validation_status['successful_checks'] += 1
@@ -335,9 +326,8 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
 
     def record_component_timing(component_name, start_time, end_time=None):
         duration = (end_time or time.time()) - start_time
-        if component_name not in validation_status['performance_metrics']['component_timings']:
-            validation_status['performance_metrics']['component_timings'][component_name] = []
-        validation_status['performance_metrics']['component_timings'][component_name].append(duration)
+        cm = validation_status['performance_metrics']['component_timings']
+        cm.setdefault(component_name, []).append(duration)
         return duration
 
     def record_interaction(interaction_name, start_time, end_time=None):
@@ -350,9 +340,8 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         return duration
 
     def record_element_timing(element_name, duration):
-        if element_name not in validation_status['performance_metrics']['element_timings']:
-            validation_status['performance_metrics']['element_timings'][element_name] = []
-        validation_status['performance_metrics']['element_timings'][element_name].append(duration)
+        em = validation_status['performance_metrics']['element_timings']
+        em.setdefault(element_name, []).append(duration)
 
     def highlight(element):
         try:
@@ -489,14 +478,101 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             record_interaction(f"Sub-tab {sub_tab_name} load", sub_tab_start)
             return False
 
+    def handle_add_button(main_index, tab_name):
+        """
+        Optionally click the Add button on a main tab (if present),
+        then try to Cancel / go back.
+
+        Logs (success only):
+        - "Add button clicked successfully on Main Tab 'X'"
+        - "Cancel button clicked successfully" (if Cancel works)
+        """
+        pause_event.wait()
+        if stop_event.is_set():
+            return
+
+        try:
+            # Try to locate a clickable Add button (any variant with 'btn_add' in src)
+            add_button = WebDriverWait(driver, 3).until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//img[contains(@src,'btn_add')]")
+                )
+            )
+        except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
+            # No Add button on this tab → silently ignore
+            return
+        except Exception:
+            # Any other minor issue → ignore, don't spam logs
+            return
+
+        try:
+            # Highlight ADD
+            highlight(add_button)
+            time.sleep(0.5)
+
+            if click_element_with_retry(add_button):
+                log_and_update_status(
+                    f"Add button clicked successfully on Main Tab '{tab_name}'",
+                    "Success"
+                )
+
+                # Wait for Add screen to load
+                try:
+                    WebDriverWait(driver, 5).until(
+                        EC.visibility_of_element_located((By.CSS_SELECTOR, "div#content"))
+                    )
+                except Exception:
+                    pass
+
+                # Try Cancel on Add screen (if present)
+                try:
+                    cancel_button = WebDriverWait(driver, 3).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//img[contains(@src,'btn_cancel')]")
+                        )
+                    )
+                    if cancel_button:
+                        highlight(cancel_button)
+                        time.sleep(0.5)
+                        if click_element_with_retry(cancel_button):
+                            log_and_update_status("Cancel button clicked successfully", "Success")
+                        else:
+                            try:
+                                driver.back()
+                                time.sleep(2)
+                            except Exception:
+                                pass
+                except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
+                    # No Cancel on Add screen → best-effort back, no logs
+                    try:
+                        driver.back()
+                        time.sleep(2)
+                    except Exception:
+                        pass
+                except Exception:
+                    # Unexpected Cancel issue → best-effort back
+                    try:
+                        driver.back()
+                        time.sleep(2)
+                    except Exception:
+                        pass
+
+        except Exception:
+            # Any unexpected Add flow issue → ignore (no warnings)
+            try:
+                driver.back()
+                time.sleep(2)
+            except Exception:
+                pass
+
     def validate_first_list_element_and_cancel(column_index, main_index, sub_index):
         """
-        For the current sub-tab:
+        Record Workflow Check for a sub-tab:
         - Optionally click Search (if present)
         - Click first row element in given column
         - Optionally click Cancel (if present) to return
 
-        Logging (success cases only):
+        Logs (success cases only):
         - "Search button clicked successfully"
         - "Clicked first list element in column X"
         - "Cancel button clicked successfully"
@@ -513,29 +589,31 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
             )
 
-            # 1) Try clicking Search button if present (any style)
+            # 1) Optional Search
             try:
-                search_button = find_element_with_retry(
-                    driver,
-                    By.XPATH,
-                    "//img[contains(@src,'btn_search')]",
-                    max_attempts=2,
-                    wait_time=3
-                )
-                if search_button and click_element_with_retry(search_button):
-                    log_and_update_status("Search button clicked successfully", "Success")
-                    time.sleep(1.5)
-                    WebDriverWait(driver, 5).until(
-                        EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
+                search_button = WebDriverWait(driver, 3).until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, "//img[contains(@src,'btn_search')]")
                     )
+                )
+                if search_button:
+                    highlight(search_button)
+                    time.sleep(0.5)
+
+                    if click_element_with_retry(search_button):
+                        log_and_update_status("Search button clicked successfully", "Success")
+                        time.sleep(1.5)
+                        WebDriverWait(driver, 5).until(
+                            EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
+                        )
             except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
-                # No search or unusable → silently ignore
+                # Search not present → silently ignore
                 pass
             except Exception:
                 # Any other search-related issue → silently ignore
                 pass
 
-            # 2) Handle the table rows
+            # 2) Table rows
             max_attempts = 3
             attempt = 0
             rows = []
@@ -557,7 +635,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 return True
 
             try:
-                # 3) Find the first clickable element in the given column
+                # 3) First clickable element in the given column
                 try:
                     first_element = find_element_with_retry(
                         driver,
@@ -579,7 +657,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     return True
 
                 highlight(first_element)
-                time.sleep(1)
+                time.sleep(0.5)
 
                 element_start = time.time()
 
@@ -605,32 +683,40 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 )
                 time.sleep(1)
 
-                # 4) Try to find Cancel button dynamically
+                # 4) Optional Cancel
                 try:
-                    cancel_button = find_element_with_retry(
-                        driver,
-                        By.XPATH,
-                        "//img[contains(@src,'btn_cancel')]",
-                        max_attempts=2
+                    cancel_button = WebDriverWait(driver, 3).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//img[contains(@src,'btn_cancel')]")
+                        )
                     )
-                    if cancel_button and click_element_with_retry(cancel_button):
-                        log_and_update_status("Cancel button clicked successfully", "Success")
+                    if cancel_button:
+                        highlight(cancel_button)
+                        time.sleep(0.5)
+
+                        if click_element_with_retry(cancel_button):
+                            log_and_update_status("Cancel button clicked successfully", "Success")
+                        else:
+                            try:
+                                driver.back()
+                                time.sleep(2)
+                            except Exception:
+                                pass
                     else:
-                        # If click failed, best-effort navigate back silently
                         try:
                             driver.back()
                             time.sleep(2)
                         except Exception:
                             pass
                 except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
-                    # No Cancel visible → silently go back
+                    # Cancel not present → best-effort back
                     try:
                         driver.back()
                         time.sleep(2)
                     except Exception:
                         pass
                 except Exception:
-                    # Any unexpected error with Cancel → try to go back silently
+                    # Unexpected Cancel issue → best-effort back
                     try:
                         driver.back()
                         time.sleep(2)
@@ -664,9 +750,9 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             record_interaction("Record Workflow Check (error)", list_start)
             return True
 
+    # ---- navigate to base URL ----
     driver.set_page_load_timeout(30)
 
-    # ---------- Navigation to base URL ----------
     try:
         navigation_attempts = 0
         max_navigation_attempts = 3
@@ -710,7 +796,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         validation_status['end_time'] = time.strftime("%Y-%m-%d %H:%M:%S")
         return validation_results, False
 
-    # ---------- Tab / Sub-tab handling ----------
+    # ---- tabs / sub-tabs ----
     all_tabs_opened = True
 
     def handle_sub_tabs(tab_name, sub_tabs, main_index):
@@ -746,7 +832,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     if not first_list_element_success:
                         all_tabs_opened = False
                 else:
-                    result = f"{main_index}.{chr(96 + sub_index)}. No column index specified for '{sub_tab_name}' - skipping record workflow check."
+                    result = f"{main_index}.{chr(96 + sub_index)}. No column index specified for '{sub_tab_name}' - skipping Record Workflow Check."
                     log_and_update_status(result, "Skipped")
             else:
                 all_tabs_opened = False
@@ -793,6 +879,9 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     result = f"{i}. Main Tab '{tab_name}' opened successfully."
                     log_and_update_status(result, "Success")
 
+                    # Optional Add button on main tab
+                    handle_add_button(i, tab_name)
+
                     if 'sub_tabs' in tab_data:
                         sub_tab_results = handle_sub_tabs(tab_name, tab_data['sub_tabs'], i)
                         validation_results.extend(sub_tab_results)
@@ -836,9 +925,9 @@ Successful: {validation_status['successful_checks']} ({success_rate:.1f}%)
 Failed: {validation_status['failed_checks']}
 Skipped: {validation_status['skipped_checks']}
 Duration: {(time.time() - time.mktime(time.strptime(validation_status['start_time'], "%Y-%m-%d %H:%M:%S"))):.1f} seconds
-    """
+    """.strip()
 
-    log_and_update_status(summary_message.strip(), "Info")
+    log_and_update_status(summary_message, "Info")
 
     if all_tabs_opened and validation_status['failed_checks'] > 0:
         logging.info(
@@ -1009,13 +1098,11 @@ def submit_test_results(validation_portal_link):
                 logging.warning(f"Error while closing validation portal WebDriver: {e}")
 
 
-# Error handler for rate limiting
 @app.errorhandler(429)
 def too_many_requests(e):
     return jsonify({"error": "Too many requests. Please try again later."}), 429
 
 
-# Health check endpoint
 @app.route('/health')
 def health():
     status = {
