@@ -1978,20 +1978,33 @@ def capture_dashboard_html(selected_date, environment='PROD'):
         # Click on main dashboard tab using JavaScript (more reliable than Selenium click)
         try:
             print("Attempting to click main dashboard tab...")
-            result = driver.execute_script("""
-                var tab = document.getElementById('tab-main-dashboard');
-                if (tab) {
-                    tab.click();
-                    console.log('Tab clicked successfully');
-                    return 'clicked';
-                } else {
-                    console.error('Tab element not found');
-                    return 'not_found';
-                }
-            """)
-            print(f"Main dashboard tab click result: {result}")
+            # Find the tab by text content
+            tab_element = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Main Dashboard')]"))
+            )
+            tab_element.click()
+            print("Main dashboard tab clicked via Selenium")
+            
+            # Also try JS click to be sure
+            driver.execute_script("arguments[0].click();", tab_element)
+            print("Main dashboard tab clicked via JS")
+            
         except Exception as tab_error:
             print(f"Warning: Could not click tab: {str(tab_error)}")
+            # Try finding it via class if text fails
+            try:
+                driver.execute_script("""
+                    var tabs = document.querySelectorAll('.nav-link');
+                    for (var i = 0; i < tabs.length; i++) {
+                        if (tabs[i].innerText.includes('Main Dashboard')) {
+                            tabs[i].click();
+                            console.log('Clicked tab via JS loop');
+                            break;
+                        }
+                    }
+                """)
+            except:
+                pass
             # Continue anyway - the content might still be visible
         
         # Wait for data to load (increased from 12 to 15 seconds)
@@ -2001,33 +2014,15 @@ def capture_dashboard_html(selected_date, environment='PROD'):
         
         # Wait for actual dashboard content to be present (graphs, tables, etc.)
         try:
-            print("Waiting for dashboard content to render (Plotly graphs)...")
-            # Wait for at least one graph to be present (indicates data has loaded)
+            print("Waiting for dashboard content to render (status-bar-graph)...")
+            # Wait for a specific element inside the Main Dashboard tab
             WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.CLASS_NAME, "plotly"))
+                EC.presence_of_element_located((By.ID, "status-bar-graph"))
             )
-            print("Dashboard content detected - Plotly graphs found")
+            print("Dashboard content detected - status-bar-graph found")
         except Exception as content_wait_error:
             print(f"Warning: Timeout waiting for dashboard content: {str(content_wait_error)}")
             print("Checking if any content exists anyway...")
-            # Check what elements are present
-            try:
-                element_check = driver.execute_script("""
-                    var dashboard = document.getElementById('tab-main-dashboard');
-                    if (!dashboard) return 'dashboard_not_found';
-                    var plotly = dashboard.querySelectorAll('.plotly');
-                    var graphs = dashboard.querySelectorAll('.js-plotly-plot');
-                    var tables = dashboard.querySelectorAll('table');
-                    return {
-                        'plotly_count': plotly.length,
-                        'graphs_count': graphs.length,
-                        'tables_count': tables.length,
-                        'children_count': dashboard.children.length
-                    };
-                """)
-                print(f"Element check result: {element_check}")
-            except Exception as check_error:
-                print(f"Could not check elements: {str(check_error)}")
         
         # Additional wait to ensure everything is rendered
         print("Waiting 5 more seconds for full render...")
@@ -2045,62 +2040,45 @@ def capture_dashboard_html(selected_date, environment='PROD'):
             }
             
             // Remove other tabs (keep only main dashboard)
-            var tabs = document.querySelectorAll('.tab-pane');
-            tabs.forEach(function(tab) {
-                if (tab.id !== 'tab-main-dashboard') {
-                    tab.remove();
-                }
-            });
-            console.log('Other tabs removed');
-            
-            // Remove tab navigation
-            var tabNav = document.querySelector('.tabs');
-            if (tabNav) {
-                tabNav.remove();
-                console.log('Tab navigation removed');
+            // We can't easily remove other tabs if we don't know their IDs, 
+            // but we can hide the nav bar itself
+            var navTabs = document.querySelector('.nav-tabs');
+            if (navTabs) {
+                navTabs.style.display = 'none';
             }
             
-            // Remove date picker and environment selector
-            var datePicker = document.getElementById('date-picker-table');
-            if (datePicker && datePicker.parentElement) {
-                datePicker.parentElement.parentElement.remove();
-                console.log('Date picker removed');
+            // Remove date picker and environment selector container
+            // It's usually the first row
+            var firstRow = document.querySelector('.container-fluid > .row:first-child');
+            if (firstRow) {
+                firstRow.style.display = 'none';
             }
         """)
         print("Unwanted elements removed")
         
         time.sleep(1)
         
-        # Get the HTML content of the main dashboard - simplified approach
+        # Get the HTML content of the main dashboard
         try:
             print("Attempting to capture dashboard HTML...")
+            # Capture the tab-content div which contains the active tab pane
             dashboard_html = driver.execute_script("""
-                var dashboard = document.getElementById('tab-main-dashboard');
-                if (!dashboard) {
-                    console.error('Dashboard element not found');
-                    return '';
+                var content = document.querySelector('.tab-content');
+                if (!content) {
+                    console.error('Tab content container not found');
+                    // Fallback to main container
+                    var container = document.querySelector('.container-fluid');
+                    return container ? container.outerHTML : '';
                 }
                 
-                console.log('Dashboard element found');
-                console.log('Dashboard innerHTML length: ' + dashboard.innerHTML.length);
-                console.log('Dashboard outerHTML length: ' + dashboard.outerHTML.length);
-                
-                // Check if dashboard has any content
-                if (dashboard.children.length === 0) {
-                    console.error('Dashboard element is empty - no children');
-                    return '';
+                // Check if it has content
+                if (content.innerHTML.trim() === '') {
+                    console.error('Tab content is empty');
+                    // Try to return the whole body for debugging if empty
+                    return document.body.outerHTML;
                 }
                 
-                console.log('Dashboard has ' + dashboard.children.length + ' children');
-                
-                // Check visibility
-                var style = window.getComputedStyle(dashboard);
-                console.log('Dashboard display: ' + style.display);
-                console.log('Dashboard visibility: ' + style.visibility);
-                
-                // Simply return the HTML without complex inline styling
-                // Email clients will handle basic styles from the parent
-                return dashboard.outerHTML;
+                return content.outerHTML;
             """)
             
             print(f"JavaScript execution complete. HTML length: {len(dashboard_html) if dashboard_html else 0}")
@@ -2109,23 +2087,9 @@ def capture_dashboard_html(selected_date, environment='PROD'):
                 print("WARNING: Dashboard HTML is empty")
                 # Try to get page source for debugging
                 page_source = driver.page_source
-                print(f"Page source length: {len(page_source)} characters")
-                if 'tab-main-dashboard' in page_source:
-                    print("Dashboard element exists in page source")
-                    # Try to find the element and check its content
-                    try:
-                        element = driver.find_element(By.ID, "tab-main-dashboard")
-                        print(f"Dashboard element found via Selenium")
-                        print(f"Element tag: {element.tag_name}")
-                        print(f"Element is displayed: {element.is_displayed()}")
-                        print(f"Element text length: {len(element.text)}")
-                    except Exception as elem_error:
-                        print(f"Could not find element via Selenium: {str(elem_error)}")
-                else:
-                    print("ERROR: Dashboard element NOT found in page source")
-                return None
-                
-            print(f"Dashboard HTML captured successfully ({len(dashboard_html)} characters)")
+                print(f"Page source length: {len(page_source)}")
+                return page_source # Return full page source as fallback
+            
             return dashboard_html
             
         except Exception as script_error:
