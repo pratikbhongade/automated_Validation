@@ -1836,7 +1836,13 @@ def capture_main_dashboard(selected_date, environment='PROD', output_path=None):
     edge_options.add_argument("--disable-gpu")
     edge_options.add_argument("--no-sandbox")
     edge_options.add_argument("--disable-dev-shm-usage")
+    edge_options.add_argument("--disable-software-rasterizer")
+    edge_options.add_argument("--disable-extensions")
+    edge_options.add_argument("--disable-logging")
+    edge_options.add_argument("--log-level=3")
     edge_options.add_argument("--window-size=1920,1080")  # Standard HD viewport
+    # Suppress GPU errors
+    edge_options.add_experimental_option('excludeSwitches', ['enable-logging'])
     
     # Initialize the driver using Selenium Manager (automatic driver management)
     # No need to specify executable_path - Selenium Manager handles it automatically
@@ -1929,7 +1935,13 @@ def capture_dashboard_html(selected_date, environment='PROD'):
     edge_options.add_argument("--disable-gpu")
     edge_options.add_argument("--no-sandbox")
     edge_options.add_argument("--disable-dev-shm-usage")
+    edge_options.add_argument("--disable-software-rasterizer")
+    edge_options.add_argument("--disable-extensions")
+    edge_options.add_argument("--disable-logging")
+    edge_options.add_argument("--log-level=3")
     edge_options.add_argument("--window-size=1920,1080")
+    # Suppress GPU errors
+    edge_options.add_experimental_option('excludeSwitches', ['enable-logging'])
     
     # Initialize the driver using Selenium Manager (automatic driver management)
     # No need to specify executable_path - Selenium Manager handles it automatically
@@ -2031,12 +2043,14 @@ def send_email_with_screenshot(image_path, processing_date, environment, benchma
     Send an email with the dashboard HTML content embedded
     
     Parameters:
-    - image_path: Path to the dashboard image (used as fallback)
+    - image_path: (UNUSED - kept for backward compatibility)
     - processing_date: Date string for the email
     - environment: Environment (PROD, IT, QV)
     - benchmark_end_time_formatted: Formatted time string for the email
     - failed_jobs: DataFrame containing information about failed jobs (optional)
     - solution_text: Text describing the solution/fix applied (optional)
+    
+    Note: This function now only uses HTML capture. Screenshot functionality has been removed.
     """
     # Create Outlook email
     outlook = win32.Dispatch('outlook.application')
@@ -2138,45 +2152,35 @@ def send_email_with_screenshot(image_path, processing_date, environment, benchma
         '''
         print("Email body created with embedded dashboard HTML")
     else:
-        # Fallback to screenshot if HTML capture failed
-        print("HTML capture failed, falling back to screenshot")
-        try:
-            with open(image_path, 'rb') as f:
-                image_data = f.read()
-                image_cid = 'dashboard_image'
-        except Exception as e:
-            print(f"Error reading image: {str(e)}")
-            image_cid = 'dashboard_image'
-        
+        # HTML capture failed - show error message
+        print("ERROR: HTML capture failed")
         mail.HTMLBody = f'''
-        <p>Hi All,</p>
-        <p>Please find the status of Aspire Nightly Batch - <strong>{processing_date}</strong></p>
-        <p><strong>Highlight:</strong></p>
-        <ul>
-            {highlights_html}
-        </ul>
-        {solution_html}
-        <p><u><strong>AspireVision Dashboard</strong></u>:</p>
-        <img src="cid:{image_cid}" width="800">
-        <p>Thanks &amp; Regards,</p>
-        <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.4; border-top: 1px solid #eeeeee; padding-top: 10px; margin-top: 10px;">
-            <tr>
-                <td style="vertical-align: top;">
-                    <strong style="color: #086C49;">Pratik Bhongade</strong><br>
-                    <span style="color: #666666;">Software Engineer</span><br>
-                    <span style="color: #666666;">KTO CBTO Equipment Finance | Pune, India</span><br>
-                    <a href="mailto:Pratik_Bhongade@key.com" style="color: #086C49; text-decoration: none;">Pratik_Bhongade@key.com</a><br>
-                </td>
-            </tr>
-        </table>
+        <html>
+        <body>
+            <p>Hi All,</p>
+            <p>Please find the status of Aspire Nightly Batch - <strong>{processing_date}</strong> - <strong>{environment}</strong></p>
+            <p><strong>Highlight:</strong></p>
+            <ul>
+                {highlights_html}
+            </ul>
+            {solution_html}
+            
+            <p style="color: red;"><strong>Error:</strong> Unable to capture dashboard content. Please check the application logs.</p>
+            
+            <p>Thanks &amp; Regards,</p>
+            <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.4; border-top: 1px solid #eeeeee; padding-top: 10px; margin-top: 10px;">
+                <tr>
+                    <td style="vertical-align: top;">
+                        <strong style="color: #086C49;">Pratik Bhongade</strong><br>
+                        <span style="color: #666666;">Software Engineer</span><br>
+                        <span style="color: #666666;">KTO CBTO Equipment Finance | Pune, India</span><br>
+                        <a href="mailto:Pratik_Bhongade@key.com" style="color: #086C49; text-decoration: none;">Pratik_Bhongade@key.com</a><br>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
         '''
-        
-        # Attach the image
-        try:
-            attachment = mail.Attachments.Add(image_path)
-            attachment.PropertyAccessor.SetProperty("http://schemas.microsoft.com/mapi/proptag/0x3712001F", image_cid)
-        except Exception as e:
-            print(f"Error attaching image: {str(e)}")
     
     # Return the mail object instead of sending it
     # This allows us to preview it before sending
