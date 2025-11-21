@@ -20,6 +20,7 @@ import io
 import json
 import time
 import urllib.parse
+import urllib.request
 from time import perf_counter
 import win32com.client as win32
 # Removed multiprocessing to avoid PyInstaller issues
@@ -2058,39 +2059,102 @@ def capture_dashboard_html(selected_date, environment='PROD'):
         
         time.sleep(1)
         
-        # Get the HTML content of the main dashboard
+        # Get the HTML content and styles
         try:
-            print("Attempting to capture dashboard HTML...")
-            # Capture the tab-content div which contains the active tab pane
-            dashboard_html = driver.execute_script("""
+            print("Attempting to capture dashboard HTML and styles...")
+            capture_data = driver.execute_script("""
                 var content = document.querySelector('.tab-content');
+                var html = '';
                 if (!content) {
                     console.error('Tab content container not found');
-                    // Fallback to main container
                     var container = document.querySelector('.container-fluid');
-                    return container ? container.outerHTML : '';
-                }
-                
-                // Check if it has content
-                if (content.innerHTML.trim() === '') {
+                    html = container ? container.outerHTML : '';
+                } else if (content.innerHTML.trim() === '') {
                     console.error('Tab content is empty');
-                    // Try to return the whole body for debugging if empty
-                    return document.body.outerHTML;
+                    html = document.body.outerHTML;
+                } else {
+                    html = content.outerHTML;
                 }
                 
-                return content.outerHTML;
+                // Extract styles
+                var styles = [];
+                var styleTags = document.getElementsByTagName('style');
+                for (var i = 0; i < styleTags.length; i++) {
+                    styles.push(styleTags[i].innerHTML);
+                }
+                
+                // Extract CSS URLs
+                var cssUrls = [];
+                var linkTags = document.getElementsByTagName('link');
+                for (var i = 0; i < linkTags.length; i++) {
+                    if (linkTags[i].rel === 'stylesheet') {
+                        cssUrls.push(linkTags[i].href);
+                    }
+                }
+                
+                return {
+                    'html': html,
+                    'styles': styles,
+                    'css_urls': cssUrls
+                };
             """)
             
+            dashboard_html = capture_data.get('html', '')
+            inline_styles = capture_data.get('styles', [])
+            css_urls = capture_data.get('css_urls', [])
+            
             print(f"JavaScript execution complete. HTML length: {len(dashboard_html) if dashboard_html else 0}")
+            print(f"Found {len(inline_styles)} inline style blocks")
+            print(f"Found {len(css_urls)} external CSS files")
             
             if not dashboard_html or dashboard_html.strip() == '':
                 print("WARNING: Dashboard HTML is empty")
-                # Try to get page source for debugging
-                page_source = driver.page_source
-                print(f"Page source length: {len(page_source)}")
-                return page_source # Return full page source as fallback
+                return driver.page_source
             
-            return dashboard_html
+            # Construct final HTML with styles
+            final_style_block = ""
+            
+            # Add external CSS
+            # import urllib.request - already imported at top
+            for css_url in css_urls:
+                try:
+                    print(f"Fetching CSS from: {css_url}")
+                    with urllib.request.urlopen(css_url, timeout=5) as response:
+                        css_content = response.read().decode('utf-8')
+                        final_style_block += f"/* CSS from {css_url} */\n{css_content}\n"
+                except Exception as e:
+                    print(f"Warning: Could not fetch CSS from {css_url}: {e}")
+            
+            # Add inline styles
+            for style in inline_styles:
+                final_style_block += f"\n{style}\n"
+                
+            # Wrap in HTML structure with critical overrides for email
+            full_html = f"""
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    {final_style_block}
+                    /* Custom overrides for email compatibility */
+                    .tab-content {{ display: block !important; opacity: 1 !important; visibility: visible !important; }}
+                    .tab-pane {{ display: block !important; opacity: 1 !important; visibility: visible !important; }}
+                    .fade {{ opacity: 1 !important; transition: none !important; }}
+                    body {{ background-color: #fff; font-family: sans-serif; }}
+                    /* Ensure graphs are visible */
+                    .js-plotly-plot {{ width: 100% !important; height: auto !important; }}
+                    svg {{ max-width: 100% !important; height: auto !important; }}
+                </style>
+            </head>
+            <body>
+                <div class="dashboard-container" style="padding: 20px;">
+                    {dashboard_html}
+                </div>
+            </body>
+            </html>
+            """
+            
+            return full_html
             
         except Exception as script_error:
             print(f"Error executing JavaScript to capture HTML: {str(script_error)}")
@@ -2177,23 +2241,10 @@ def send_email_with_screenshot(image_path, processing_date, environment, benchma
     # Build email body with embedded dashboard HTML
     if dashboard_html_content:
         # Successfully captured HTML - embed it
-        mail.HTMLBody = f'''
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                .email-header {{ margin-bottom: 20px; }}
-                .dashboard-container {{ 
-                    border: 1px solid #ddd; 
-                    padding: 15px; 
-                    margin: 20px 0;
-                    background-color: #f9f9f9;
-                    border-radius: 5px;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="email-header">
+        
+        # Construct email header
+        email_header = f'''
+            <div class="email-header" style="font-family: Arial, sans-serif; margin: 20px;">
                 <p>Hi All,</p>
                 <p>Please find the status of Aspire Nightly Batch - <strong>{processing_date}</strong> - <strong>{environment}</strong></p>
                 <p><strong>Highlight:</strong></p>
@@ -2201,27 +2252,38 @@ def send_email_with_screenshot(image_path, processing_date, environment, benchma
                     {highlights_html}
                 </ul>
                 {solution_html}
+                <p><u><strong>AspireVision Dashboard</strong></u>:</p>
             </div>
-            
-            <p><u><strong>AspireVision Dashboard</strong></u>:</p>
-            <div class="dashboard-container">
-                {dashboard_html_content}
-            </div>
-            
-            <p>Thanks &amp; Regards,</p>
-            <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.4; border-top: 1px solid #eeeeee; padding-top: 10px; margin-top: 10px;">
-                <tr>
-                    <td style="vertical-align: top;">
-                        <strong style="color: #086C49;">Pratik Bhongade</strong><br>
-                        <span style="color: #666666;">Software Engineer</span><br>
-                        <span style="color: #666666;">KTO CBTO Equipment Finance | Pune, India</span><br>
-                        <a href="mailto:Pratik_Bhongade@key.com" style="color: #086C49; text-decoration: none;">Pratik_Bhongade@key.com</a><br>
-                    </td>
-                </tr>
-            </table>
-        </body>
-        </html>
         '''
+        
+        # Construct email footer
+        email_footer = f'''
+            <div style="font-family: Arial, sans-serif; margin: 20px;">
+                <p>Thanks &amp; Regards,</p>
+                <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.4; border-top: 1px solid #eeeeee; padding-top: 10px; margin-top: 10px;">
+                    <tr>
+                        <td style="vertical-align: top;">
+                            <strong style="color: #086C49;">Pratik Bhongade</strong><br>
+                            <span style="color: #666666;">Software Engineer</span><br>
+                            <span style="color: #666666;">KTO CBTO Equipment Finance | Pune, India</span><br>
+                            <a href="mailto:Pratik_Bhongade@key.com" style="color: #086C49; text-decoration: none;">Pratik_Bhongade@key.com</a><br>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        '''
+        
+        # Inject into the captured HTML
+        # The captured HTML is a full document with <head> and <style>
+        # We insert our header at the start of body, and footer at the end
+        if "<body>" in dashboard_html_content:
+            final_html = dashboard_html_content.replace("<body>", f"<body>{email_header}")
+            final_html = final_html.replace("</body>", f"{email_footer}</body>")
+            mail.HTMLBody = final_html
+        else:
+            # Fallback if structure is unexpected
+            mail.HTMLBody = email_header + dashboard_html_content + email_footer
+            
         print("Email body created with embedded dashboard HTML")
     else:
         # HTML capture failed - show error message
