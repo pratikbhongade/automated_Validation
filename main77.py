@@ -1836,7 +1836,7 @@ def capture_main_dashboard(selected_date, environment='PROD', output_path=None):
     edge_options.add_argument("--disable-gpu")
     edge_options.add_argument("--no-sandbox")
     edge_options.add_argument("--disable-dev-shm-usage")
-    edge_options.add_argument("--window-size=1920,3180")  # Tall but not too tall
+    edge_options.add_argument("--window-size=1920,1080")  # Standard HD viewport
     
     # Path to Edge driver - Updated for PyInstaller
     edge_driver_path = get_edge_driver_path()
@@ -1865,7 +1865,7 @@ def capture_main_dashboard(selected_date, environment='PROD', output_path=None):
         
         # Clear any prior Dash persistence to avoid PROD default overriding query
         try:
-            driver.execute_script("try{ window.sessionStorage.removeItem('_dash_persistence'); }catch(e){}");
+            driver.execute_script("try{ window.sessionStorage.removeItem('_dash_persistence'); }catch(e){}")
         except Exception:
             pass
 
@@ -1874,57 +1874,34 @@ def capture_main_dashboard(selected_date, environment='PROD', output_path=None):
             EC.element_to_be_clickable((By.ID, "tab-main-dashboard"))
         ).click()
         
-        # No need to click env dropdown if URL sync is used; ensure it displays selected env
-        try:
-            label_map = {'PROD': 'Production', 'IT': 'IT Environment', 'QV': 'QV Environment'}
-            target_label = label_map.get(environment, 'Production')
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, f"//div[@id='environment-selector']//div[contains(@class,'Select-value-label')][contains(., '{target_label}')]"))
-            )
-        except Exception:
-            pass
-
-        # Set the date in case URL sync didn't take
-        driver.execute_script(f"document.getElementById('date-picker-table').value = '{selected_date}'")
-        driver.execute_script("document.getElementById('date-picker-table').dispatchEvent(new Event('change'))")
-        
-        # Wait for data to load after changing env/date
+        # Wait for data to load
         time.sleep(12)
         
-        # MINIMALIST SOLUTION:
-        # 1. Keep only the content we want
+        # Remove the send email button row before screenshot
         driver.execute_script("""
-            // Remove the send email button row
             var sendBtn = document.getElementById('send-email-row');
             if (sendBtn) sendBtn.remove();
-            
-            // Simple but effective: hide all elements after the tabs
-            var tabs = document.querySelector('.tabs');
-            var nextSibling = tabs.nextElementSibling;
-            while (nextSibling) {
-                var temp = nextSibling.nextElementSibling;
-                if (nextSibling.id !== 'send-email-row') {
-                    nextSibling.style.display = 'none';
-                }
-                nextSibling = temp;
-            }
-            
-            // Hide all other tabs
-            document.querySelectorAll('.tab-pane').forEach(function(tab) {
-                if (tab.id !== 'tab-main-dashboard') {
-                    tab.style.display = 'none';
-                }
-            });
         """)
         
         # Wait for changes to apply
         time.sleep(1)
         
-        # Take the screenshot
-        driver.save_screenshot(output_path)
-        
-        print(f"Dashboard screenshot saved to {output_path}")
-        return output_path
+        # METHOD 1: Capture only the main dashboard tab content (RECOMMENDED)
+        try:
+            # Find the main dashboard tab content
+            dashboard_element = driver.find_element(By.ID, "tab-main-dashboard")
+            
+            # Screenshot only this element
+            dashboard_element.screenshot(output_path)
+            print(f"Dashboard screenshot saved to {output_path} (element capture)")
+            return output_path
+            
+        except Exception as e:
+            print(f"Element screenshot failed: {str(e)}, falling back to full page")
+            # Fallback to full page screenshot
+            driver.save_screenshot(output_path)
+            print(f"Dashboard screenshot saved to {output_path} (full page fallback)")
+            return output_path
         
     except Exception as e:
         print(f"Error capturing screenshot: {str(e)}")
@@ -1938,13 +1915,130 @@ def capture_main_dashboard(selected_date, environment='PROD', output_path=None):
     finally:
         driver.quit()
 
-def send_email_with_screenshot(image_path, processing_date, environment, benchmark_end_time_formatted, failed_jobs=None, solution_text=None):
+def capture_dashboard_html(selected_date, environment='PROD'):
     """
-    Send an email with the dashboard screenshot and failed job details
+    Capture the dashboard HTML content for embedding in email
     
     Parameters:
-    - image_path: Path to the dashboard image
+    - selected_date: Date to use for the dashboard
+    - environment: Environment to use (PROD, IT, QV)
+    
+    Returns:
+    - HTML string with inlined styles
+    """
+    # Configure Edge options
+    edge_options = EdgeOptions()
+    edge_options.add_argument("--headless=new")
+    edge_options.add_argument("--disable-gpu")
+    edge_options.add_argument("--no-sandbox")
+    edge_options.add_argument("--disable-dev-shm-usage")
+    edge_options.add_argument("--window-size=1920,1080")
+    
+    # Path to Edge driver
+    edge_driver_path = get_edge_driver_path()
+    
+    # Initialize the driver
+    try:
+        webdriver_service = EdgeService(executable_path=edge_driver_path)
+        driver = webdriver.Edge(service=webdriver_service, options=edge_options)
+    except Exception as e:
+        print(f"Error initializing Edge WebDriver: {str(e)}")
+        return None
+    
+    try:
+        # Open the dashboard
+        query = urllib.parse.urlencode({
+            'env': environment,
+            'date': selected_date
+        })
+        driver.get(f"http://127.0.0.1:8050/?{query}")
+        
+        # Wait for the page to load
+        WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.ID, "date-picker-table"))
+        )
+        
+        # Click on main dashboard tab
+        WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.ID, "tab-main-dashboard"))
+        ).click()
+        
+        # Wait for data to load
+        time.sleep(12)
+        
+        # Remove unwanted elements
+        driver.execute_script("""
+            // Remove send email button
+            var sendBtn = document.getElementById('send-email-row');
+            if (sendBtn) sendBtn.remove();
+            
+            // Remove other tabs (keep only main dashboard)
+            var tabs = document.querySelectorAll('.tab-pane');
+            tabs.forEach(function(tab) {
+                if (tab.id !== 'tab-main-dashboard') {
+                    tab.remove();
+                }
+            });
+            
+            // Remove tab navigation
+            var tabNav = document.querySelector('.tabs');
+            if (tabNav) tabNav.remove();
+            
+            // Remove date picker and environment selector
+            var datePicker = document.getElementById('date-picker-table');
+            if (datePicker && datePicker.parentElement) {
+                datePicker.parentElement.parentElement.remove();
+            }
+        """)
+        
+        time.sleep(1)
+        
+        # Get the HTML content of the main dashboard
+        dashboard_html = driver.execute_script("""
+            var dashboard = document.getElementById('tab-main-dashboard');
+            if (!dashboard) return '';
+            
+            // Get all computed styles and inline them
+            function inlineStyles(element) {
+                var computedStyle = window.getComputedStyle(element);
+                var styleString = '';
+                for (var i = 0; i < computedStyle.length; i++) {
+                    var prop = computedStyle[i];
+                    styleString += prop + ':' + computedStyle.getPropertyValue(prop) + ';';
+                }
+                element.setAttribute('style', styleString);
+                
+                // Recursively inline styles for children
+                for (var j = 0; j < element.children.length; j++) {
+                    inlineStyles(element.children[j]);
+                }
+            }
+            
+            // Clone the dashboard to avoid modifying the original
+            var clone = dashboard.cloneNode(true);
+            inlineStyles(clone);
+            
+            return clone.outerHTML;
+        """)
+        
+        print(f"Dashboard HTML captured successfully")
+        return dashboard_html
+        
+    except Exception as e:
+        print(f"Error capturing dashboard HTML: {str(e)}")
+        return None
+    finally:
+        driver.quit()
+
+
+def send_email_with_screenshot(image_path, processing_date, environment, benchmark_end_time_formatted, failed_jobs=None, solution_text=None):
+    """
+    Send an email with the dashboard HTML content embedded
+    
+    Parameters:
+    - image_path: Path to the dashboard image (used as fallback)
     - processing_date: Date string for the email
+    - environment: Environment (PROD, IT, QV)
     - benchmark_end_time_formatted: Formatted time string for the email
     - failed_jobs: DataFrame containing information about failed jobs (optional)
     - solution_text: Text describing the solution/fix applied (optional)
@@ -1965,15 +2059,6 @@ def send_email_with_screenshot(image_path, processing_date, environment, benchma
     except Exception:
         mail.To = 'Pratik_Bhongade@Keybank.com;karen.a.tiemann-wozniak@key.com'
     mail.Subject = f'AspireVision Dashboard - {processing_date} - {environment}'
-    
-    # Read the image
-    try:
-        with open(image_path, 'rb') as f:
-            image_data = f.read()
-            image_cid = 'dashboard_image'
-    except Exception as e:
-        print(f"Error reading image: {str(e)}")
-        image_cid = 'dashboard_image'
     
     # Create highlights section with failed job information if available
     highlights_html = (
@@ -2004,36 +2089,99 @@ def send_email_with_screenshot(image_path, processing_date, environment, benchma
         </div>
         """
     
-    # MODIFICATION: Updated Email Footer - removed image and disclaimer line
-    mail.HTMLBody = f'''
-    <p>Hi All,</p>
-    <p>Please find the status of Aspire Nightly Batch - <strong>{processing_date}</strong></p>
-    <p><strong>Highlight:</strong></p>
-    <ul>
-        {highlights_html}
-    </ul>
-    {solution_html}
-    <p><u><strong>AspireVision Dashboard</strong></u>:</p>
-    <img src="cid:{image_cid}" width="800">
-    <p>Thanks & Regards,</p>
-    <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.4; border-top: 1px solid #eeeeee; padding-top: 10px; margin-top: 10px;">
-        <tr>
-            <td style="vertical-align: top;">
-                <strong style="color: #086C49;">Pratik Bhongade</strong><br>
-                <span style="color: #666666;">Software Engineer</span><br>
-                <span style="color: #666666;">KTO CBTO Equipment Finance | Pune, India</span><br>
-                <a href="mailto:Pratik_Bhongade@key.com" style="color: #086C49; text-decoration: none;">Pratik_Bhongade@key.com</a><br>
-            </td>
-        </tr>
-    </table>
-    '''
-
-    # Attach the image
-    try:
-        attachment = mail.Attachments.Add(image_path)
-        attachment.PropertyAccessor.SetProperty("http://schemas.microsoft.com/mapi/proptag/0x3712001F", image_cid)
-    except Exception as e:
-        print(f"Error attaching image: {str(e)}")
+    # Capture the dashboard HTML content
+    print(f"Capturing dashboard HTML for {processing_date}...")
+    dashboard_html_content = capture_dashboard_html(processing_date, environment)
+    
+    # Build email body with embedded dashboard HTML
+    if dashboard_html_content:
+        # Successfully captured HTML - embed it
+        mail.HTMLBody = f'''
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                .email-header {{ margin-bottom: 20px; }}
+                .dashboard-container {{ 
+                    border: 1px solid #ddd; 
+                    padding: 15px; 
+                    margin: 20px 0;
+                    background-color: #f9f9f9;
+                    border-radius: 5px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="email-header">
+                <p>Hi All,</p>
+                <p>Please find the status of Aspire Nightly Batch - <strong>{processing_date}</strong> - <strong>{environment}</strong></p>
+                <p><strong>Highlight:</strong></p>
+                <ul>
+                    {highlights_html}
+                </ul>
+                {solution_html}
+            </div>
+            
+            <p><u><strong>AspireVision Dashboard</strong></u>:</p>
+            <div class="dashboard-container">
+                {dashboard_html_content}
+            </div>
+            
+            <p>Thanks &amp; Regards,</p>
+            <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.4; border-top: 1px solid #eeeeee; padding-top: 10px; margin-top: 10px;">
+                <tr>
+                    <td style="vertical-align: top;">
+                        <strong style="color: #086C49;">Pratik Bhongade</strong><br>
+                        <span style="color: #666666;">Software Engineer</span><br>
+                        <span style="color: #666666;">KTO CBTO Equipment Finance | Pune, India</span><br>
+                        <a href="mailto:Pratik_Bhongade@key.com" style="color: #086C49; text-decoration: none;">Pratik_Bhongade@key.com</a><br>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        '''
+        print("Email body created with embedded dashboard HTML")
+    else:
+        # Fallback to screenshot if HTML capture failed
+        print("HTML capture failed, falling back to screenshot")
+        try:
+            with open(image_path, 'rb') as f:
+                image_data = f.read()
+                image_cid = 'dashboard_image'
+        except Exception as e:
+            print(f"Error reading image: {str(e)}")
+            image_cid = 'dashboard_image'
+        
+        mail.HTMLBody = f'''
+        <p>Hi All,</p>
+        <p>Please find the status of Aspire Nightly Batch - <strong>{processing_date}</strong></p>
+        <p><strong>Highlight:</strong></p>
+        <ul>
+            {highlights_html}
+        </ul>
+        {solution_html}
+        <p><u><strong>AspireVision Dashboard</strong></u>:</p>
+        <img src="cid:{image_cid}" width="800">
+        <p>Thanks &amp; Regards,</p>
+        <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.4; border-top: 1px solid #eeeeee; padding-top: 10px; margin-top: 10px;">
+            <tr>
+                <td style="vertical-align: top;">
+                    <strong style="color: #086C49;">Pratik Bhongade</strong><br>
+                    <span style="color: #666666;">Software Engineer</span><br>
+                    <span style="color: #666666;">KTO CBTO Equipment Finance | Pune, India</span><br>
+                    <a href="mailto:Pratik_Bhongade@key.com" style="color: #086C49; text-decoration: none;">Pratik_Bhongade@key.com</a><br>
+                </td>
+            </tr>
+        </table>
+        '''
+        
+        # Attach the image
+        try:
+            attachment = mail.Attachments.Add(image_path)
+            attachment.PropertyAccessor.SetProperty("http://schemas.microsoft.com/mapi/proptag/0x3712001F", image_cid)
+        except Exception as e:
+            print(f"Error attaching image: {str(e)}")
     
     # Return the mail object instead of sending it
     # This allows us to preview it before sending
