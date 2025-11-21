@@ -957,16 +957,17 @@ def update_dashboard(selected_date, environment, href):
         # ... rest of function unchanged ...
         
         # Calculate job duration and format times for display - keep original datetime columns intact
-        df.loc[:, 'Duration'] = (pd.to_datetime(df['EndTime']) - pd.to_datetime(df['StartTime'])).dt.total_seconds() / 60
-        df.loc[:, 'Duration'] = df['Duration'].round(2).astype(str) + ' mins'
+        # Use direct assignment to avoid FutureWarning
+        duration_mins = (pd.to_datetime(df['EndTime']) - pd.to_datetime(df['StartTime'])).dt.total_seconds() / 60
+        df['Duration'] = duration_mins.round(2).astype(str) + ' mins'
         
-        df.loc[:, 'StartDate'] = pd.to_datetime(df['StartTime']).dt.strftime('%Y-%m-%d')
-        df.loc[:, 'StartTimeDisplay'] = pd.to_datetime(df['StartTime']).dt.strftime('%I:%M:%S %p')
-        df.loc[:, 'EndDate'] = pd.to_datetime(df['EndTime']).dt.strftime('%Y-%m-%d')
-        df.loc[:, 'EndTimeDisplay'] = pd.to_datetime(df['EndTime']).dt.strftime('%I:%M:%S %p')
+        df['StartDate'] = pd.to_datetime(df['StartTime']).dt.strftime('%Y-%m-%d')
+        df['StartTimeDisplay'] = pd.to_datetime(df['StartTime']).dt.strftime('%I:%M:%S %p')
+        df['EndDate'] = pd.to_datetime(df['EndTime']).dt.strftime('%Y-%m-%d')
+        df['EndTimeDisplay'] = pd.to_datetime(df['EndTime']).dt.strftime('%I:%M:%S %p')
 
         if not df_unlock_online.empty:
-            df_unlock_online.loc[:, 'CompletionTime'] = pd.to_datetime(df_unlock_online['CompletionTime']).dt.strftime('%I:%M:%S %p')
+            df_unlock_online['CompletionTime'] = pd.to_datetime(df_unlock_online['CompletionTime']).dt.strftime('%I:%M:%S %p')
 
         filtered_df = df
         try:
@@ -982,16 +983,17 @@ def update_dashboard(selected_date, environment, href):
         return message, None, message, empty_fig, empty_fig, empty_fig, html.Div(), empty_fig, empty_fig, empty_fig
 
     # Calculate job duration and format times for display - keep original datetime columns intact
-    df.loc[:, 'Duration'] = (pd.to_datetime(df['EndTime']) - pd.to_datetime(df['StartTime'])).dt.total_seconds() / 60
-    df.loc[:, 'Duration'] = df['Duration'].round(2).astype(str) + ' mins'
+    # Use direct assignment to avoid FutureWarning
+    duration_mins = (pd.to_datetime(df['EndTime']) - pd.to_datetime(df['StartTime'])).dt.total_seconds() / 60
+    df['Duration'] = duration_mins.round(2).astype(str) + ' mins'
     
-    df.loc[:, 'StartDate'] = pd.to_datetime(df['StartTime']).dt.strftime('%Y-%m-%d')
-    df.loc[:, 'StartTimeDisplay'] = pd.to_datetime(df['StartTime']).dt.strftime('%I:%M:%S %p')
-    df.loc[:, 'EndDate'] = pd.to_datetime(df['EndTime']).dt.strftime('%Y-%m-%d')
-    df.loc[:, 'EndTimeDisplay'] = pd.to_datetime(df['EndTime']).dt.strftime('%I:%M:%S %p')
+    df['StartDate'] = pd.to_datetime(df['StartTime']).dt.strftime('%Y-%m-%d')
+    df['StartTimeDisplay'] = pd.to_datetime(df['StartTime']).dt.strftime('%I:%M:%S %p')
+    df['EndDate'] = pd.to_datetime(df['EndTime']).dt.strftime('%Y-%m-%d')
+    df['EndTimeDisplay'] = pd.to_datetime(df['EndTime']).dt.strftime('%I:%M:%S %p')
 
     if not df_unlock_online.empty:
-        df_unlock_online.loc[:, 'CompletionTime'] = pd.to_datetime(df_unlock_online['CompletionTime']).dt.strftime('%I:%M:%S %p')
+        df_unlock_online['CompletionTime'] = pd.to_datetime(df_unlock_online['CompletionTime']).dt.strftime('%I:%M:%S %p')
 
     filtered_df = df
 
@@ -1687,13 +1689,14 @@ def handle_send_email(n_clicks, confirm_clicks, cancel_clicks, selected_date, en
                 return n_clicks, False, False
             
             # Format date and time for display - FIXED DataFrame warnings
-            df.loc[:, 'Duration'] = (pd.to_datetime(df['EndTime']) - pd.to_datetime(df['StartTime'])).dt.total_seconds() / 60
-            df.loc[:, 'Duration'] = df['Duration'].round(2).astype(str) + ' mins'
+            # Use direct assignment to avoid FutureWarning
+            duration_mins = (pd.to_datetime(df['EndTime']) - pd.to_datetime(df['StartTime'])).dt.total_seconds() / 60
+            df['Duration'] = duration_mins.round(2).astype(str) + ' mins'
             
-            df.loc[:, 'StartDate'] = pd.to_datetime(df['StartTime']).dt.strftime('%Y-%m-%d')
-            df.loc[:, 'StartTime'] = pd.to_datetime(df['StartTime']).dt.strftime('%I:%M:%S %p')
-            df.loc[:, 'EndDate'] = pd.to_datetime(df['EndTime']).dt.strftime('%Y-%m-%d')
-            df.loc[:, 'EndTime'] = pd.to_datetime(df['EndTime']).dt.strftime('%I:%M:%S %p')
+            df['StartDate'] = pd.to_datetime(df['StartTime']).dt.strftime('%Y-%m-%d')
+            df['StartTime'] = pd.to_datetime(df['StartTime']).dt.strftime('%I:%M:%S %p')
+            df['EndDate'] = pd.to_datetime(df['EndTime']).dt.strftime('%Y-%m-%d')
+            df['EndTime'] = pd.to_datetime(df['EndTime']).dt.strftime('%I:%M:%S %p')
             
             # Get failed jobs with updated criteria
             failed_jobs = df[
@@ -1785,7 +1788,7 @@ def run_dash_server_directly():
         # Start the server in a separate thread to avoid blocking
         def start_server():
             try:
-                app.run_server(
+                app.run(
                     debug=False, 
                     port=8050, 
                     use_reloader=False,
