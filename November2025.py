@@ -141,14 +141,13 @@ def setup_driver():
     unless the driver is already cached/available in PATH.
     """
     options = Options()
-    options.add_argument("--start-maximized")          # Start maximized
-    options.add_argument("--disable-extensions")       # Disable extensions
-    options.add_argument("--disable-popup-blocking")   # Disable popup blocking
-    options.add_argument("--disable-infobars")         # Disable infobars
-    options.page_load_strategy = 'normal'              # Wait for full page load
+    options.add_argument("--start-maximized")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-popup-blocking")
+    options.add_argument("--disable-infobars")
+    options.page_load_strategy = 'normal'
 
     try:
-        # Selenium Manager handles driver resolution automatically
         driver = webdriver.Edge(options=options)
         logging.info("Using Edge WebDriver via Selenium Manager (auto-managed)")
     except WebDriverException as e:
@@ -167,7 +166,6 @@ def setup_driver():
 
     driver.set_page_load_timeout(30)
     driver.set_script_timeout(30)
-
     return driver
 
 
@@ -193,14 +191,13 @@ def find_element_with_retry(driver, by, value, max_attempts=3, wait_time=5,
                     f"Failed to find element after {max_attempts} attempts: {by}={value}, Error: {e}"
                 )
                 if isinstance(e, StaleElementReferenceException):
-                    # On stale element, try to refresh the page as last resort
                     try:
                         driver.refresh()
                         time.sleep(2)
                     except:
                         pass
                 raise last_exception
-            time.sleep(1)  # Short delay before retry
+            time.sleep(1)
 
     return None
 
@@ -212,7 +209,7 @@ def click_element_with_retry(element, max_attempts=3):
     attempt = 0
     while attempt < max_attempts:
         try:
-            # First try to scroll element into view
+            # Scroll into view
             try:
                 driver = element._parent
                 driver.execute_script("arguments[0].scrollIntoView(true);", element)
@@ -220,13 +217,12 @@ def click_element_with_retry(element, max_attempts=3):
             except:
                 pass
 
-            # Try clicking with JavaScript first (more reliable)
+            # JS click first
             try:
                 driver = element._parent
                 driver.execute_script("arguments[0].click();", element)
                 return True
             except:
-                # Fall back to regular click
                 element.click()
                 return True
 
@@ -269,10 +265,10 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
     validation_status['successful_checks'] = 0
     validation_status['failed_checks'] = 0
     validation_status['skipped_checks'] = 0
-    validation_status['progress'] = 0  # Initialize progress at 0%
+    validation_status['progress'] = 0
     validation_status['screenshots'] = []
 
-    # Track previous failed checks for retry (currently not used, but kept for future)
+    # Reset / track previous results if needed
     previous_results = validation_status['results'] if retry_failed else []
     validation_status['results'] = []
 
@@ -312,8 +308,8 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
     def log_and_update_status(message, status="Success"):
         """
         Log a message and update the validation status
+        status allowed: "Success", "Failed", "Skipped", "Info"
         """
-        # Update counters
         if status == "Success":
             validation_status['successful_checks'] += 1
         elif status == "Failed":
@@ -321,25 +317,23 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         elif status == "Skipped":
             validation_status['skipped_checks'] += 1
 
-        # Format message with timestamp
         timestamp = time.strftime("%H:%M:%S")
         formatted_message = f"[{timestamp}] [{status}] {message}"
 
-        # Log to console and file
         print(formatted_message)
         if status == "Success":
             logging.info(message)
         elif status == "Failed":
             logging.error(message)
-        else:
-            logging.warning(message)
+        elif status == "Skipped":
+            logging.info(f"Skipped: {message}")
+        else:  # Info
+            logging.info(message)
 
-        # Add to results
         validation_results.append((message, status))
         validation_status['results'].append(formatted_message)
 
     def record_component_timing(component_name, start_time, end_time=None):
-        """Record timing for a component"""
         duration = (end_time or time.time()) - start_time
         if component_name not in validation_status['performance_metrics']['component_timings']:
             validation_status['performance_metrics']['component_timings'][component_name] = []
@@ -347,7 +341,6 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         return duration
 
     def record_interaction(interaction_name, start_time, end_time=None):
-        """Record timing for an interaction"""
         duration = (end_time or time.time()) - start_time
         validation_status['performance_metrics']['interaction_timings'].append({
             'name': interaction_name,
@@ -357,7 +350,6 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
         return duration
 
     def record_element_timing(element_name, duration):
-        """Record timing for element interaction"""
         if element_name not in validation_status['performance_metrics']['element_timings']:
             validation_status['performance_metrics']['element_timings'][element_name] = []
         validation_status['performance_metrics']['element_timings'][element_name].append(duration)
@@ -383,7 +375,6 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             )
             driver.save_screenshot(screenshot_file)
 
-            # Store screenshot data in validation status
             with open(screenshot_file, "rb") as image_file:
                 encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
                 validation_status['screenshots'].append({
@@ -407,10 +398,8 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             highlight(tab_element)
             time.sleep(1)
 
-            # Record timing for tab interaction
             tab_start = time.time()
 
-            # Use the retry click function
             if not click_element_with_retry(tab_element):
                 result = f"{index}. Failed to click on Main Tab '{tab_name}' even though the element is present."
                 log_and_update_status(result, "Failed")
@@ -420,7 +409,6 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             locator_type = content_locator['type']
             locator_value = content_locator['value']
 
-            # Check if expected content appears after clicking
             try:
                 if locator_type == 'css':
                     WebDriverWait(driver, 5).until(
@@ -436,16 +424,15 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 record_interaction(f"Tab {tab_name} load", tab_start)
                 return False
 
-            # Record successful tab load
             tab_duration = record_interaction(f"Tab {tab_name} load", tab_start)
             record_component_timing(f"Tab: {tab_name}", tab_start)
 
             result = f"{index}. Main Tab '{tab_name}' opened successfully in {tab_duration:.2f}s."
-            log_and_update_status(result)
+            log_and_update_status(result, "Success")
             return True
 
         except StaleElementReferenceException:
-            result = f"{index}. StaleElementReferenceException on Main Tab '{tab_name}'. The page may have changed while trying to interact with it."
+            result = f"{index}. StaleElementReferenceException on Main Tab '{tab_name}'."
             log_and_update_status(result, "Failed")
             record_interaction(f"Tab {tab_name} load", tab_start)
             return False
@@ -459,7 +446,6 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             time.sleep(1)
             sub_tab_start = time.time()
 
-            # Execute the JavaScript to navigate to the sub-tab
             driver.execute_script(sub_tab_js)
 
             locator_type = content_locator['type']
@@ -484,7 +470,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             record_component_timing(f"Sub-tab: {sub_tab_name}", sub_tab_start)
 
             result = f"{main_index}.{chr(96 + sub_index)}. Sub Tab '{sub_tab_name}' opened successfully in {sub_tab_duration:.2f}s."
-            log_and_update_status(result)
+            log_and_update_status(result, "Success")
             return True
 
         except JavascriptException as e:
@@ -493,7 +479,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
             record_interaction(f"Sub-tab {sub_tab_name} load", sub_tab_start)
             return False
         except StaleElementReferenceException:
-            result = f"{main_index}.{chr(96 + sub_index)}. StaleElementReferenceException on Sub Tab '{sub_tab_name}'. The page may have changed during interaction."
+            result = f"{main_index}.{chr(96 + sub_index)}. StaleElementReferenceException on Sub Tab '{sub_tab_name}'."
             log_and_update_status(result, "Failed")
             record_interaction(f"Sub-tab {sub_tab_name} load", sub_tab_start)
             return False
@@ -506,9 +492,14 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
     def validate_first_list_element_and_cancel(column_index, main_index, sub_index):
         """
         For the current sub-tab:
-        - Optionally click Search (if button exists)
-        - Validate the first row's clickable element
-        - Click Cancel (any cancel button variant) to return
+        - Optionally click Search (if present)
+        - Click first row element in given column
+        - Optionally click Cancel (if present) to return
+
+        Logging (success cases only):
+        - "Search button clicked successfully"
+        - "Clicked first list element in column X"
+        - "Cancel button clicked successfully"
         """
         pause_event.wait()
         if stop_event.is_set():
@@ -522,7 +513,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                 EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
             )
 
-            # 🔍 1) Try clicking Search button if present (any style)
+            # 1) Try clicking Search button if present (any style)
             try:
                 search_button = find_element_with_retry(
                     driver,
@@ -531,32 +522,20 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     max_attempts=2,
                     wait_time=3
                 )
-                if search_button:
-                    highlight(search_button)
-                    time.sleep(0.5)
-                    if click_element_with_retry(search_button):
-                        log_and_update_status(
-                            f"{main_index}.{chr(96 + sub_index)}. Search button clicked successfully.",
-                            "Success"
-                        )
-                        # Wait for results to refresh
-                        time.sleep(1.5)
-                        WebDriverWait(driver, 5).until(
-                            EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
-                        )
-            except (TimeoutException, NoSuchElementException):
-                # No Search button is totally fine – not all screens need it
-                log_and_update_status(
-                    f"{main_index}.{chr(96 + sub_index)}. No Search button found - skipping Search click.",
-                    "Skipped"
-                )
-            except Exception as e:
-                log_and_update_status(
-                    f"{main_index}.{chr(96 + sub_index)}. Error while clicking Search button: {str(e)}. Skipping Search.",
-                    "Warning"
-                )
+                if search_button and click_element_with_retry(search_button):
+                    log_and_update_status("Search button clicked successfully", "Success")
+                    time.sleep(1.5)
+                    WebDriverWait(driver, 5).until(
+                        EC.visibility_of_element_located((By.CSS_SELECTOR, "table.ListView"))
+                    )
+            except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
+                # No search or unusable → silently ignore
+                pass
+            except Exception:
+                # Any other search-related issue → silently ignore
+                pass
 
-            # 🔎 2) Now handle the table rows
+            # 2) Handle the table rows
             max_attempts = 3
             attempt = 0
             rows = []
@@ -572,14 +551,13 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     time.sleep(1)
 
             if len(rows) <= 1:
-                result = f"{main_index}.{chr(96 + sub_index)}. There is no data in the sub tab '{sub_index}' to check so skipping."
+                result = "There is no data in this sub-tab to validate (no rows). Skipping."
                 log_and_update_status(result, "Skipped")
-                record_interaction("List validation (no data)", list_start)
+                record_interaction("Record Workflow Check (no data)", list_start)
                 return True
 
             try:
                 # 3) Find the first clickable element in the given column
-                first_element = None
                 try:
                     first_element = find_element_with_retry(
                         driver,
@@ -589,94 +567,101 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                         wait_time=3
                     )
                 except (TimeoutException, NoSuchElementException):
-                    result = f"{main_index}.{chr(96 + sub_index)}. No clickable element found in column {column_index} of the first row - skipping."
+                    result = f"No clickable element found in column {column_index} of the first row - skipping."
                     log_and_update_status(result, "Skipped")
-                    record_interaction("List validation (no element)", list_start)
+                    record_interaction("Record Workflow Check (no element)", list_start)
                     return True
 
-                if first_element:
-                    highlight(first_element)
-                    time.sleep(1)
+                if not first_element:
+                    result = f"First row clickable element is None for column {column_index} - skipping."
+                    log_and_update_status(result, "Skipped")
+                    record_interaction("Record Workflow Check (no element)", list_start)
+                    return True
 
-                    element_start = time.time()
+                highlight(first_element)
+                time.sleep(1)
 
-                    if not click_element_with_retry(first_element):
-                        result = f"{main_index}.{chr(96 + sub_index)}. Failed to click first element - element became stale. Skipping."
-                        log_and_update_status(result, "Skipped")
-                        record_interaction("List element click", element_start)
-                        return True
+                element_start = time.time()
 
-                    element_duration = time.time() - element_start
-                    record_element_timing("List element click", element_duration)
-
-                    WebDriverWait(driver, 5).until(
-                        EC.visibility_of_element_located((By.CSS_SELECTOR, "div#content"))
+                if not click_element_with_retry(first_element):
+                    result = (
+                        f"Failed to click first row element in column {column_index}. "
+                        "Element became stale. Skipping."
                     )
-                    time.sleep(1)
+                    log_and_update_status(result, "Skipped")
+                    record_interaction("Record Workflow element click", element_start)
+                    return True
 
-                    # 4) Find Cancel button dynamically (supports .gif and .jpg)
-                    try:
-                        cancel_button = find_element_with_retry(
-                            driver,
-                            By.XPATH,
-                            "//img[contains(@src,'btn_cancel')]",
-                            max_attempts=2
-                        )
+                element_duration = time.time() - element_start
+                record_element_timing("Record Workflow element click", element_duration)
 
-                        highlight(cancel_button)
-                        time.sleep(1)
+                log_and_update_status(
+                    f"Clicked first list element in column {column_index}",
+                    "Success"
+                )
 
-                        if not click_element_with_retry(cancel_button):
-                            result = f"{main_index}.{chr(96 + sub_index)}. Failed to click cancel button - element became stale. Attempting to navigate back."
-                            log_and_update_status(result, "Warning")
-                            try:
-                                driver.back()
-                                time.sleep(2)
-                            except:
-                                pass
-                            record_interaction("List validation complete", list_start)
-                            return True
-                    except (TimeoutException, NoSuchElementException):
-                        result = f"{main_index}.{chr(96 + sub_index)}. Cancel button not found. Attempting to navigate back."
-                        log_and_update_status(result, "Warning")
+                WebDriverWait(driver, 5).until(
+                    EC.visibility_of_element_located((By.CSS_SELECTOR, "div#content"))
+                )
+                time.sleep(1)
+
+                # 4) Try to find Cancel button dynamically
+                try:
+                    cancel_button = find_element_with_retry(
+                        driver,
+                        By.XPATH,
+                        "//img[contains(@src,'btn_cancel')]",
+                        max_attempts=2
+                    )
+                    if cancel_button and click_element_with_retry(cancel_button):
+                        log_and_update_status("Cancel button clicked successfully", "Success")
+                    else:
+                        # If click failed, best-effort navigate back silently
                         try:
                             driver.back()
                             time.sleep(2)
-                        except:
+                        except Exception:
                             pass
-                        record_interaction("List validation complete", list_start)
-                        return True
+                except (TimeoutException, NoSuchElementException, StaleElementReferenceException):
+                    # No Cancel visible → silently go back
+                    try:
+                        driver.back()
+                        time.sleep(2)
+                    except Exception:
+                        pass
+                except Exception:
+                    # Any unexpected error with Cancel → try to go back silently
+                    try:
+                        driver.back()
+                        time.sleep(2)
+                    except Exception:
+                        pass
 
-                    list_duration = record_interaction("List validation complete", list_start)
-                    result = f"{main_index}.{chr(96 + sub_index)}. List validation completed in {list_duration:.2f}s."
-                    log_and_update_status(result)
-                    return True
-                else:
-                    result = f"{main_index}.{chr(96 + sub_index)}. No clickable element found in first row - skipping."
-                    log_and_update_status(result, "Skipped")
-                    record_interaction("List validation (no element)", list_start)
-                    return True
+                list_duration = record_interaction("Record Workflow Check complete", list_start)
+                result = f"Record Workflow Check completed in {list_duration:.2f}s."
+                log_and_update_status(result, "Success")
+                return True
 
             except Exception as e:
-                result = f"{main_index}.{chr(96 + sub_index)}. Exception while handling list element: {str(e)}. Skipping."
-                log_and_update_status(result, "Warning")
-                record_interaction("List validation (error)", list_start)
+                result = f"Exception while handling record workflow: {str(e)}. Skipping."
+                log_and_update_status(result, "Skipped")
+                record_interaction("Record Workflow Check (error)", list_start)
                 return True
 
         except (TimeoutException, NoSuchElementException) as e:
-            result = f"{main_index}.{chr(96 + sub_index)}. Failed to find the list table: {str(e)}"
+            result = f"Failed to find the list table: {str(e)}"
             log_and_update_status(result, "Failed")
-            record_interaction("List validation (table not found)", list_start)
+            record_interaction("Record Workflow Check (table not found)", list_start)
             return False
-        except StaleElementReferenceException as e:
-            result = f"{main_index}.{chr(96 + sub_index)}. StaleElementReferenceException while handling list table. Skipping."
+        except StaleElementReferenceException:
+            result = "StaleElementReferenceException while handling record workflow table. Skipping."
             log_and_update_status(result, "Skipped")
-            record_interaction("List validation (stale element)", list_start)
+            record_interaction("Record Workflow Check (stale element)", list_start)
             return True
         except Exception as e:
-            result = f"{main_index}.{chr(96 + sub_index)}. Unexpected error: {str(e)}. Skipping."
-            log_and_update_status(result, "Warning")
-            record_interaction("List validation (error)", list_start)
+            result = f"Unexpected error in record workflow: {str(e)}. Skipping."
+            log_and_update_status(result, "Skipped")
+            record_interaction("Record Workflow Check (error)", list_start)
             return True
 
     driver.set_page_load_timeout(30)
@@ -761,7 +746,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
                     if not first_list_element_success:
                         all_tabs_opened = False
                 else:
-                    result = f"{main_index}.{chr(96 + sub_index)}. No column index specified for '{sub_tab_name}' - skipping element check."
+                    result = f"{main_index}.{chr(96 + sub_index)}. No column index specified for '{sub_tab_name}' - skipping record workflow check."
                     log_and_update_status(result, "Skipped")
             else:
                 all_tabs_opened = False
@@ -806,7 +791,7 @@ def validate_application(environment, validation_portal_link=None, retry_failed=
 
                 if success:
                     result = f"{i}. Main Tab '{tab_name}' opened successfully."
-                    log_and_update_status(result)
+                    log_and_update_status(result, "Success")
 
                     if 'sub_tabs' in tab_data:
                         sub_tab_results = handle_sub_tabs(tab_name, tab_data['sub_tabs'], i)
@@ -853,7 +838,7 @@ Skipped: {validation_status['skipped_checks']}
 Duration: {(time.time() - time.mktime(time.strptime(validation_status['start_time'], "%Y-%m-%d %H:%M:%S"))):.1f} seconds
     """
 
-    log_and_update_status(summary_message, "Info")
+    log_and_update_status(summary_message.strip(), "Info")
 
     if all_tabs_opened and validation_status['failed_checks'] > 0:
         logging.info(
@@ -872,7 +857,7 @@ Duration: {(time.time() - time.mktime(time.strptime(validation_status['start_tim
 
     if all_tabs_opened:
         result = ("Validation completed successfully.", "Success")
-        log_and_update_status(result[0])
+        log_and_update_status(result[0], "Success")
         validation_status['status'] = 'Completed'
 
         if validation_portal_link:
@@ -1273,8 +1258,10 @@ def generate_report():
             status = "Success"
             if "[Failed]" in result:
                 status = "Failed"
-            elif "[Skipped]" in result or "[Warning]" in result:
+            elif "[Skipped]" in result:
                 status = "Skipped"
+            elif "[Info]" in result:
+                status = "Info"
             formatted_results.append({
                 "index": i,
                 "message": result,
