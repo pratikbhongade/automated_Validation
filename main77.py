@@ -1960,18 +1960,33 @@ def capture_dashboard_html(selected_date, environment='PROD'):
         })
         driver.get(f"http://127.0.0.1:8050/?{query}")
         
-        # Wait for the page to load
+        # Wait for the page to load completely
         WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.ID, "date-picker-table"))
         )
         
-        # Click on main dashboard tab
-        WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.ID, "tab-main-dashboard"))
-        ).click()
+        # Wait a bit more for Dash to fully initialize
+        time.sleep(3)
         
-        # Wait for data to load
-        time.sleep(12)
+        # Click on main dashboard tab using JavaScript (more reliable than Selenium click)
+        try:
+            driver.execute_script("""
+                var tab = document.getElementById('tab-main-dashboard');
+                if (tab) {
+                    tab.click();
+                    console.log('Tab clicked successfully');
+                } else {
+                    console.error('Tab element not found');
+                }
+            """)
+            print("Main dashboard tab clicked")
+        except Exception as tab_error:
+            print(f"Warning: Could not click tab: {str(tab_error)}")
+            # Continue anyway - the content might still be visible
+        
+        # Wait for data to load (increased from 12 to 15 seconds)
+        print("Waiting for dashboard data to load...")
+        time.sleep(15)
         
         # Remove unwanted elements
         driver.execute_script("""
